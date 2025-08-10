@@ -1,0 +1,39 @@
+# Tool configurations and parameters
+tools:
+  nmap:
+    name: "Network Mapper"
+    binary: "nmap"
+    default_args:
+      - "-sV"  # Version detection
+      - "-sC"  # Default scripts
+      - "-O"   # OS detection
+    profiles:
+      quick:
+        args: ["-F"]  # Fast scan
+      full:
+        args: ["-p-", "-A"]  # All ports, aggressive
+      
+  nikto:
+    name: "Web Vulnerability Scanner"
+    binary: "nikto"
+    default_args:
+      - "-C"
+      - "all"
+      
+  sqlmap:
+    name: "SQL Injection Scanner"
+    binary: "sqlmap"
+    default_args:
+      - "--batch"
+      - "--random-agent"
+      
+  subfinder:
+    name: "Subdomain Finder"
+    binary: "subfinder"
+    default_args:
+      - "-silent"
+      
+  dirb:
+    name: "Directory Scanner"
+    binary: "dirb"
+    wordlist: "/usr/share/wordlists/dirb/common.txt"

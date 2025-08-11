@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.core import InputValidator, validate_ip, validate_domain
 from src.scanners.recon.port_scanner import PortScanner
 from src.scanners.recon.dns_scanner import DNSScanner
+from src.scanners.vulnerability.web_scanner import WebScanner
+from src.scanners.vulnerability.directory_scanner import DirectoryScanner
 from src.utils.logger import (
     LoggerSetup,
     log_banner,
@@ -63,6 +65,292 @@ def cli(debug, quiet):
 @cli.command()
 @click.argument("target")
 @click.option(
+    "--tool",
+    type=click.Choice(["dirb", "gobuster", "auto"]),
+    default="auto",
+    help="Scanner tool to use",
+)
+@click.option(
+    "--wordlist",
+    default="common",
+    help="Wordlist to use (small, common, big, or custom path)",
+)
+@click.option(
+    "--extensions/--no-extensions", default=True, help="Include file extensions in scan"
+)
+@click.option("--extension-list", help="Custom extension list (comma-separated)")
+@click.option(
+    "--threads", type=int, default=10, help="Number of threads (gobuster only)"
+)
+@click.option(
+    "--timeout", type=int, default=300, help="Directory scan timeout in seconds"
+)
+@click.option(
+    "--output", type=click.Path(), help="Output file for results (JSON format)"
+)
+@click.option(
+    "--scheme",
+    type=click.Choice(["http", "https"]),
+    default="https",
+    help="URL scheme to use",
+)
+@click.option("--port", type=int, help="Custom port number")
+def directory(
+    target,
+    tool,
+    wordlist,
+    extensions,
+    extension_list,
+    threads,
+    timeout,
+    output,
+    scheme,
+    port,
+):
+    """
+    Perform directory and file enumeration on the target.
+
+    TARGET can be a URL, domain name, or IP address.
+
+    Examples:
+    \b
+        auto-pentest directory https://example.com
+        auto-pentest directory example.com --tool gobuster --wordlist big
+        auto-pentest directory 192.168.1.1 --no-extensions
+        auto-pentest directory target.com --extension-list php,asp,jsp
+    """
+    log_banner(f"Directory Enumeration - {target}", "bold cyan")
+
+    try:
+        # Create directory scanner
+        dir_scanner = DirectoryScanner(timeout=timeout)
+
+        log_info(f"Target: {target}")
+        log_info(f"Tool: {tool}")
+        log_info(f"Wordlist: {wordlist}")
+
+        # Prepare scan options
+        scan_options = {
+            "tool": tool,
+            "wordlist": wordlist,
+            "extensions": extensions,
+            "threads": threads,
+            "scheme": scheme,
+        }
+
+        if port:
+            scan_options["port"] = port
+        if extension_list:
+            scan_options["extension_list"] = extension_list.split(",")
+
+        log_info(f"Directory scan options: {scan_options}")
+
+        # Check dependencies
+        capabilities = dir_scanner.get_capabilities()
+        dirb_available = capabilities["dependencies"]["dirb"]["available"]
+        gobuster_available = capabilities["dependencies"]["gobuster"]["available"]
+
+        if tool == "dirb" and not dirb_available:
+            log_error("Dirb not found!")
+            log_info("Install with: sudo apt install dirb")
+            sys.exit(1)
+        elif tool == "gobuster" and not gobuster_available:
+            log_error("Gobuster not found!")
+            log_info("Install with: sudo apt install gobuster")
+            sys.exit(1)
+        elif tool == "auto" and not (dirb_available or gobuster_available):
+            log_error("Neither dirb nor gobuster found!")
+            log_info("Install with: sudo apt install dirb gobuster")
+            sys.exit(1)
+
+        log_info("Starting directory enumeration...")
+
+        # Execute directory scan
+        result = dir_scanner.scan(target, scan_options)
+
+        # Display results
+        display_scan_results(result)
+
+        # Save results
+        if output:
+            output_path = Path(output)
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Clean target for filename
+            clean_target = (
+                target.replace("://", "_").replace("/", "_").replace(":", "_")
+            )
+            filename = f"directory_{clean_target}_{timestamp}.json"
+            output_path = REPORT_DIR / filename
+
+        result.save_to_file(output_path)
+        log_success(f"Results saved to: {output_path}")
+
+        # Summary
+        log_banner("Directory Scan Summary", "bold green")
+        log_info(f"Target: {result.target}")
+        log_info(f"Status: {result.status.value}")
+        log_info(f"Total findings: {len(result.findings)}")
+        log_info(f"Tool used: {result.metadata.get('tool_used', 'unknown')}")
+
+        # Count findings by type
+        directories = len(
+            [f for f in result.findings if f.get("item_type") == "directory"]
+        )
+        files = len([f for f in result.findings if f.get("item_type") == "file"])
+        interesting = len(
+            [f for f in result.findings if f.get("is_interesting", False)]
+        )
+
+        if directories > 0:
+            log_info(f"Directories found: {directories}")
+        if files > 0:
+            log_info(f"Files found: {files}")
+        if interesting > 0:
+            log_warning(f"Interesting items: {interesting}")
+
+        if result.errors:
+            log_warning(f"Errors encountered: {len(result.errors)}")
+
+    except KeyboardInterrupt:
+        log_warning("Directory scan interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        log_error(f"Directory scan failed: {e}")
+        if logger.level <= 10:  # DEBUG level
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("target")
+@click.option(
+    "--scheme",
+    type=click.Choice(["http", "https"]),
+    default="https",
+    help="URL scheme to use",
+)
+@click.option("--port", type=int, help="Custom port number")
+@click.option(
+    "--use-nikto/--no-nikto", default=True, help="Enable/disable Nikto scanning"
+)
+@click.option("--timeout", type=int, default=180, help="Web scan timeout in seconds")
+@click.option(
+    "--output", type=click.Path(), help="Output file for results (JSON format)"
+)
+@click.option("--user-agent", help="Custom User-Agent string")
+@click.option(
+    "--follow-redirects/--no-follow-redirects",
+    default=True,
+    help="Follow HTTP redirects",
+)
+def web(target, scheme, port, use_nikto, timeout, output, user_agent, follow_redirects):
+    """
+    Perform web vulnerability scanning on the target.
+
+    TARGET can be a URL, domain name, or IP address.
+
+    Examples:
+    \b
+        auto-pentest web https://example.com
+        auto-pentest web example.com --scheme http --port 8080
+        auto-pentest web 192.168.1.1 --no-nikto
+        auto-pentest web target.com --output web_results.json
+    """
+    log_banner(f"Web Vulnerability Scan - {target}", "bold cyan")
+
+    try:
+        # Create web scanner
+        web_scanner = WebScanner(timeout=timeout)
+
+        log_info(f"Target: {target}")
+        log_info(f"Scheme: {scheme}")
+        if port:
+            log_info(f"Port: {port}")
+
+        # Prepare scan options
+        scan_options = {
+            "scheme": scheme,
+            "use_nikto": use_nikto,
+            "follow_redirects": follow_redirects,
+        }
+
+        if port:
+            scan_options["port"] = port
+        if user_agent:
+            scan_options["user_agent"] = user_agent
+
+        log_info(f"Web scan options: {scan_options}")
+
+        # Check dependencies
+        capabilities = web_scanner.get_capabilities()
+        nikto_available = capabilities["dependencies"]["nikto"]["available"]
+
+        if use_nikto and not nikto_available:
+            log_warning("Nikto not found! Continuing without Nikto scan...")
+            scan_options["use_nikto"] = False
+        elif use_nikto and nikto_available:
+            log_info("✓ Nikto available - will perform vulnerability scan")
+
+        log_info("Starting web vulnerability scan...")
+
+        # Execute web scan
+        result = web_scanner.scan(target, scan_options)
+
+        # Display results
+        display_scan_results(result)
+
+        # Save results
+        if output:
+            output_path = Path(output)
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Clean target for filename
+            clean_target = (
+                target.replace("://", "_").replace("/", "_").replace(":", "_")
+            )
+            filename = f"web_{clean_target}_{timestamp}.json"
+            output_path = REPORT_DIR / filename
+
+        result.save_to_file(output_path)
+        log_success(f"Results saved to: {output_path}")
+
+        # Summary
+        log_banner("Web Scan Summary", "bold green")
+        log_info(f"Target: {result.target}")
+        log_info(f"Status: {result.status.value}")
+        log_info(f"Total findings: {len(result.findings)}")
+
+        # Count findings by category
+        categories = {}
+        for finding in result.findings:
+            category = finding.get("category", "unknown")
+            categories[category] = categories.get(category, 0) + 1
+
+        for category, count in categories.items():
+            if count > 0:
+                log_info(f"{category.replace('_', ' ').title()}: {count}")
+
+        if result.errors:
+            log_warning(f"Errors encountered: {len(result.errors)}")
+
+    except KeyboardInterrupt:
+        log_warning("Web scan interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        log_error(f"Web scan failed: {e}")
+        if logger.level <= 10:  # DEBUG level
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("target")
+@click.option(
     "--profile",
     type=click.Choice(["quick", "full", "web"]),
     default="quick",
@@ -84,7 +372,20 @@ def cli(debug, quiet):
     help="Nmap timing template (0=slowest, 5=fastest)",
 )
 @click.option("--include-dns", is_flag=True, help="Include DNS enumeration in scan")
-def scan(target, profile, ports, timeout, output, no_ping, timing, include_dns):
+@click.option("--include-web", is_flag=True, help="Include web vulnerability scanning")
+@click.option("--include-directory", is_flag=True, help="Include directory enumeration")
+def scan(
+    target,
+    profile,
+    ports,
+    timeout,
+    output,
+    no_ping,
+    timing,
+    include_dns,
+    include_web,
+    include_directory,
+):
     """
     Perform a security scan on the specified target.
 
@@ -96,7 +397,7 @@ def scan(target, profile, ports, timeout, output, no_ping, timing, include_dns):
         auto-pentest scan example.com --profile full
         auto-pentest scan 192.168.1.0/24 --ports 80,443,8080
         auto-pentest scan target.com --output results.json
-        auto-pentest scan example.com --include-dns
+        auto-pentest scan example.com --include-dns --include-web
     """
     log_banner(f"Auto-Pentest Scan - {target}", "bold cyan")
 
@@ -131,24 +432,33 @@ def scan(target, profile, ports, timeout, output, no_ping, timing, include_dns):
         # Results storage
         all_results = []
 
-        # Port scanning (always included)
-        log_info("Starting port scan...")
+        # Determine what to scan based on profile and options
+        scan_ports = profile != "web" and not (
+            include_web and not include_dns and not ports and not include_directory
+        )
+        scan_dns = (target_type == "domain" and include_dns) or profile == "full"
+        scan_web = include_web or profile in ["web", "full"]
+        scan_directory = include_directory or profile == "full"
 
-        # Create port scanner
-        port_scanner = PortScanner(timeout=timeout)
+        # Port scanning (unless web-only profile)
+        if scan_ports:
+            log_info("Starting port scan...")
 
-        # Check if nmap is available
-        if not port_scanner.executor.check_tool_exists("nmap"):
-            log_error("nmap is required but not found!")
-            log_info("Please install nmap: sudo apt install nmap")
-            sys.exit(1)
+            # Create port scanner
+            port_scanner = PortScanner(timeout=timeout)
 
-        # Execute port scan
-        port_result = port_scanner.scan(sanitized_target, scan_options)
-        all_results.append(port_result)
+            # Check if nmap is available
+            if not port_scanner.executor.check_tool_exists("nmap"):
+                log_error("nmap is required but not found!")
+                log_info("Please install nmap: sudo apt install nmap")
+                sys.exit(1)
+
+            # Execute port scan
+            port_result = port_scanner.scan(sanitized_target, scan_options)
+            all_results.append(port_result)
 
         # DNS scanning (if target is domain and DNS is included)
-        if (target_type == "domain" and include_dns) or profile == "full":
+        if scan_dns:
             log_info("Starting DNS enumeration...")
 
             dns_scanner = DNSScanner(timeout=timeout)
@@ -171,13 +481,58 @@ def scan(target, profile, ports, timeout, output, no_ping, timing, include_dns):
             dns_result = dns_scanner.scan(sanitized_target, dns_options)
             all_results.append(dns_result)
 
+        # Web scanning (if requested or web profile)
+        if scan_web:
+            log_info("Starting web vulnerability scan...")
+
+            web_scanner = WebScanner(timeout=timeout)
+
+            # Web scan options
+            web_options = {"scheme": "https"}
+            if profile == "web":
+                web_options["use_nikto"] = True
+                web_options["follow_redirects"] = True
+            elif profile == "full":
+                web_options["use_nikto"] = True
+                web_options["follow_redirects"] = True
+            else:
+                web_options["use_nikto"] = False  # Quick web scan
+
+            web_result = web_scanner.scan(sanitized_target, web_options)
+            all_results.append(web_result)
+
+        # Directory scanning (if requested or full profile)
+        if scan_directory:
+            log_info("Starting directory enumeration...")
+
+            dir_scanner = DirectoryScanner(timeout=timeout)
+
+            # Directory scan options
+            dir_options = {"scheme": "https"}
+            if profile == "full":
+                dir_options["wordlist"] = "big"
+                dir_options["extensions"] = True
+                dir_options["tool"] = "auto"
+            else:
+                dir_options["wordlist"] = "common"
+                dir_options["extensions"] = False
+                dir_options["tool"] = "auto"
+
+            dir_result = dir_scanner.scan(sanitized_target, dir_options)
+            all_results.append(dir_result)
+
+        # Handle case where no scans were performed
+        if not all_results:
+            log_error("No scans were performed. Check your options.")
+            sys.exit(1)
+
         # Display results
         for result in all_results:
             display_scan_results(result)
             print()  # Add spacing between scanners
 
         # Combine results for saving
-        main_result = all_results[0]  # Use port scan as main result
+        main_result = all_results[0]  # Use first scan as main result
 
         # Add findings from other scanners
         for result in all_results[1:]:
@@ -238,112 +593,6 @@ def scan(target, profile, ports, timeout, output, no_ping, timing, include_dns):
 
 @cli.command()
 @click.argument("target")
-@click.option("--zone-transfer", is_flag=True, help="Attempt DNS zone transfer")
-@click.option("--subdomain-enum", is_flag=True, help="Enable subdomain enumeration")
-@click.option(
-    "--subdomain-method",
-    type=click.Choice(["wordlist", "bruteforce"]),
-    default="wordlist",
-    help="Subdomain enumeration method",
-)
-@click.option("--timeout", type=int, default=180, help="DNS scan timeout in seconds")
-@click.option(
-    "--output", type=click.Path(), help="Output file for results (JSON format)"
-)
-def dns(target, zone_transfer, subdomain_enum, subdomain_method, timeout, output):
-    """
-    Perform DNS enumeration and analysis on the target domain.
-
-    TARGET should be a domain name (e.g., example.com).
-
-    Examples:
-    \b
-        auto-pentest dns example.com
-        auto-pentest dns example.com --zone-transfer --subdomain-enum
-        auto-pentest dns example.com --subdomain-method bruteforce
-        auto-pentest dns example.com --output dns_results.json
-    """
-    log_banner(f"DNS Enumeration - {target}", "bold cyan")
-
-    try:
-        # Validate target
-        validator = InputValidator()
-        is_valid, target_type, sanitized_target = validator.validate_target(target)
-
-        if not is_valid:
-            log_error(f"Invalid target: {target}")
-            sys.exit(1)
-
-        if target_type not in ["domain", "ip"]:
-            log_error("DNS scanning requires a domain name or IP address")
-            sys.exit(1)
-
-        log_info(f"Target: {sanitized_target} (Type: {target_type})")
-
-        # Prepare DNS scan options
-        dns_options = {
-            "zone_transfer": zone_transfer,
-            "subdomain_enum": subdomain_enum,
-            "subdomain_method": subdomain_method,
-        }
-
-        log_info(f"DNS scan options: {dns_options}")
-
-        # Create DNS scanner
-        dns_scanner = DNSScanner(timeout=timeout)
-
-        log_info("Starting DNS enumeration...")
-
-        # Execute DNS scan
-        result = dns_scanner.scan(sanitized_target, dns_options)
-
-        # Display results
-        display_scan_results(result)
-
-        # Save results
-        if output:
-            output_path = Path(output)
-        else:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"dns_{sanitized_target}_{timestamp}.json"
-            output_path = REPORT_DIR / filename
-
-        result.save_to_file(output_path)
-        log_success(f"Results saved to: {output_path}")
-
-        # Summary
-        log_banner("DNS Scan Summary", "bold green")
-        log_info(f"Target: {result.target}")
-        log_info(f"Status: {result.status.value}")
-        log_info(f"Total findings: {len(result.findings)}")
-
-        # Count findings by category
-        categories = {}
-        for finding in result.findings:
-            category = finding.get("category", "unknown")
-            categories[category] = categories.get(category, 0) + 1
-
-        for category, count in categories.items():
-            if count > 0:
-                log_info(f"{category.replace('_', ' ').title()}: {count}")
-
-        if result.errors:
-            log_warning(f"Errors encountered: {len(result.errors)}")
-
-    except KeyboardInterrupt:
-        log_warning("DNS scan interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        log_error(f"DNS scan failed: {e}")
-        if logger.level <= 10:  # DEBUG level
-            import traceback
-
-            traceback.print_exc()
-        sys.exit(1)
-
-
-@cli.command()
-@click.argument("target")
 def quick(target):
     """
     Perform a quick scan (most common ports only).
@@ -383,8 +632,9 @@ def list_tools():
         "nslookup": "DNS lookup utility (alternative)",
         "host": "DNS lookup utility (alternative)",
         "nikto": "Web vulnerability scanner",
-        "sqlmap": "SQL injection tester",
         "dirb": "Directory/file brute forcer",
+        "gobuster": "Fast directory/DNS/vhost fuzzer",
+        "sqlmap": "SQL injection tester",
         "subfinder": "Subdomain discovery tool",
         "sslscan": "SSL/TLS configuration scanner",
     }
@@ -398,6 +648,15 @@ def list_tools():
         log_error("✗ dnspython: Python DNS library (NOT INSTALLED)")
         log_info("  Install with: pip install dnspython")
 
+    # Check requests library
+    try:
+        import requests
+
+        log_success("✓ requests: Python HTTP library (INSTALLED)")
+    except ImportError:
+        log_error("✗ requests: Python HTTP library (NOT INSTALLED)")
+        log_info("  Install with: pip install requests")
+
     print()  # Add spacing
 
     for tool, description in tools.items():
@@ -409,43 +668,10 @@ def list_tools():
             log_error(f"✗ {tool}: {description} (NOT INSTALLED)")
 
     log_info("\nTo install missing tools on Ubuntu/Debian:")
-    log_info("sudo apt update && sudo apt install -y nmap nikto sqlmap dirb dnsutils")
-    log_info("pip install dnspython  # For DNS scanning functionality")
-
-
-@cli.command()
-@click.argument("result_file", type=click.Path(exists=True))
-@click.option(
-    "--format",
-    type=click.Choice(["summary", "detailed", "json"]),
-    default="summary",
-    help="Output format",
-)
-def report(result_file, format):
-    """
-    Generate a report from scan results.
-
-    RESULT_FILE should be a JSON file generated by a previous scan.
-    """
-    log_banner("Generating Report", "bold magenta")
-
-    try:
-        # Load results
-        with open(result_file, "r") as f:
-            data = json.load(f)
-
-        log_info(f"Loaded results from: {result_file}")
-
-        if format == "json":
-            click.echo(json.dumps(data, indent=2))
-        elif format == "detailed":
-            display_detailed_report(data)
-        else:
-            display_summary_report(data)
-
-    except Exception as e:
-        log_error(f"Failed to generate report: {e}")
-        sys.exit(1)
+    log_info(
+        "sudo apt update && sudo apt install -y nmap nikto sqlmap dirb gobuster dnsutils"
+    )
+    log_info("pip install dnspython requests  # For DNS and web scanning")
 
 
 @cli.command()
@@ -462,17 +688,20 @@ def info():
     log_info("\nSupported Scan Types:")
     log_info("  • Port Scanning (nmap)")
     log_info("  • DNS Enumeration (dnspython)")
-    log_info("  • [Coming Soon] Web Vulnerability Scanning")
+    log_info("  • Web Vulnerability Scanning (nikto + custom)")
+    log_info("  • Directory Enumeration (dirb/gobuster)")
     log_info("  • [Coming Soon] Subdomain Discovery")
     log_info("  • [Coming Soon] SSL/TLS Analysis")
 
     log_info("\nAvailable Commands:")
     log_info("  • scan - Comprehensive security scan")
+    log_info("  • web - Web vulnerability scanning")
+    log_info("  • directory - Directory and file enumeration")
     log_info("  • dns - DNS enumeration and analysis")
     log_info("  • quick - Quick port scan")
     log_info("  • full - Full comprehensive scan")
     log_info("  • list-tools - Check tool availability")
-    log_info("  • report - Generate reports from results")
+    log_info("  • info - Show this information")
 
     log_info("\nOutput Directories:")
     log_info(f"  • Logs: {OUTPUT_DIR / 'logs'}")
@@ -555,40 +784,6 @@ def display_scan_results(result):
         log_warning(f"Errors encountered ({len(result.errors)}):")
         for error in result.errors:
             log_error(f"  {error}")
-
-
-def display_summary_report(data):
-    """Display summary report from JSON data"""
-    log_info(f"Scan Target: {data.get('target', 'Unknown')}")
-    log_info(f"Scanner: {data.get('scanner_name', 'Unknown')}")
-    log_info(f"Status: {data.get('status', 'Unknown')}")
-    log_info(f"Findings: {data.get('findings_count', 0)}")
-
-    if data.get("duration"):
-        log_info(f"Duration: {data['duration']}")
-
-
-def display_detailed_report(data):
-    """Display detailed report from JSON data"""
-    display_summary_report(data)
-
-    log_banner("Detailed Findings", "bold white")
-
-    findings = data.get("findings", [])
-    for i, finding in enumerate(findings, 1):
-        severity = finding.get("severity", "info")
-        title = finding.get("title", f"Finding {i}")
-        description = finding.get("description", "No description")
-
-        click.echo(f"\n{i}. [{severity.upper()}] {title}")
-        click.echo(f"   {description}")
-
-        # Show additional details
-        details = finding.get("details", {})
-        if details:
-            for key, value in details.items():
-                if key not in ["host", "hostnames"]:  # Skip verbose fields
-                    click.echo(f"   {key}: {value}")
 
 
 if __name__ == "__main__":

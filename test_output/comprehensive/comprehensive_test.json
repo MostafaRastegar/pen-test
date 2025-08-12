@@ -1,0 +1,186 @@
+{
+  "report_metadata": {
+    "generated_at": "2025-08-12T09:26:58.836067",
+    "version": "0.9.1",
+    "target": "test.example.com",
+    "scan_count": 1
+  },
+  "scan_results": [
+    {
+      "scanner_name": "test_scanner",
+      "target": "test.example.com",
+      "status": "completed",
+      "start_time": "2025-08-12T09:26:58.663020",
+      "end_time": "2025-08-12T09:26:58.663028",
+      "duration": "0:00:00.000008",
+      "findings": [
+        {
+          "title": "Open SSH Port",
+          "description": "SSH service is running on port 22",
+          "severity": "info",
+          "category": "Network Services",
+          "details": "SSH (Secure Shell) service detected on port 22. This is normal for servers that require remote administration.",
+          "recommendation": "Ensure SSH is properly configured with key-based authentication and disable password authentication."
+        },
+        {
+          "title": "HTTP Service Detected",
+          "description": "Web server running on port 80",
+          "severity": "low",
+          "category": "Web Services",
+          "details": "HTTP web server detected. Consider redirecting HTTP traffic to HTTPS.",
+          "recommendation": "Configure HTTP to HTTPS redirect for better security."
+        },
+        {
+          "title": "SSL Certificate Issue",
+          "description": "SSL certificate is self-signed",
+          "severity": "medium",
+          "category": "SSL/TLS",
+          "details": "The SSL certificate is self-signed and not trusted by browsers.",
+          "recommendation": "Install a valid SSL certificate from a trusted Certificate Authority."
+        },
+        {
+          "title": "Outdated Web Server",
+          "description": "Web server version appears to be outdated",
+          "severity": "high",
+          "category": "Web Services",
+          "details": "The web server version contains known security vulnerabilities.",
+          "recommendation": "Update the web server to the latest stable version."
+        },
+        {
+          "title": "Critical Security Flaw",
+          "description": "Critical vulnerability in web application",
+          "severity": "critical",
+          "category": "Web Application",
+          "details": "A critical security vulnerability that could allow remote code execution.",
+          "recommendation": "Apply security patches immediately and consider taking the service offline until fixed."
+        }
+      ],
+      "findings_count": 5,
+      "raw_output": "",
+      "errors": [],
+      "metadata": {
+        "scan_type": "comprehensive",
+        "tool_version": "1.0.0",
+        "scan_options": "default"
+      }
+    }
+  ],
+  "aggregated_data": {
+    "title": "Security Assessment Report - test.example.com",
+    "target": "test.example.com",
+    "targets": [
+      "test.example.com"
+    ],
+    "scan_start": "2025-08-12 09:26:58",
+    "scan_end": "2025-08-12 09:26:58",
+    "duration": "0:00:00",
+    "scanners_used": [
+      "test_scanner"
+    ],
+    "total_findings": 5,
+    "critical_count": 1,
+    "high_count": 1,
+    "medium_count": 1,
+    "low_count": 1,
+    "info_count": 1,
+    "overall_risk": "Critical",
+    "findings_by_category": {
+      "Network Services": [
+        {
+          "title": "Open SSH Port",
+          "description": "SSH service is running on port 22",
+          "severity": "info",
+          "category": "Network Services",
+          "details": "SSH (Secure Shell) service detected on port 22. This is normal for servers that require remote administration.",
+          "recommendation": "Ensure SSH is properly configured with key-based authentication and disable password authentication."
+        }
+      ],
+      "Web Services": [
+        {
+          "title": "HTTP Service Detected",
+          "description": "Web server running on port 80",
+          "severity": "low",
+          "category": "Web Services",
+          "details": "HTTP web server detected. Consider redirecting HTTP traffic to HTTPS.",
+          "recommendation": "Configure HTTP to HTTPS redirect for better security."
+        },
+        {
+          "title": "Outdated Web Server",
+          "description": "Web server version appears to be outdated",
+          "severity": "high",
+          "category": "Web Services",
+          "details": "The web server version contains known security vulnerabilities.",
+          "recommendation": "Update the web server to the latest stable version."
+        }
+      ],
+      "SSL/TLS": [
+        {
+          "title": "SSL Certificate Issue",
+          "description": "SSL certificate is self-signed",
+          "severity": "medium",
+          "category": "SSL/TLS",
+          "details": "The SSL certificate is self-signed and not trusted by browsers.",
+          "recommendation": "Install a valid SSL certificate from a trusted Certificate Authority."
+        }
+      ],
+      "Web Application": [
+        {
+          "title": "Critical Security Flaw",
+          "description": "Critical vulnerability in web application",
+          "severity": "critical",
+          "category": "Web Application",
+          "details": "A critical security vulnerability that could allow remote code execution.",
+          "recommendation": "Apply security patches immediately and consider taking the service offline until fixed."
+        }
+      ]
+    },
+    "findings": [
+      {
+        "title": "Open SSH Port",
+        "description": "SSH service is running on port 22",
+        "severity": "info",
+        "category": "Network Services",
+        "details": "SSH (Secure Shell) service detected on port 22. This is normal for servers that require remote administration.",
+        "recommendation": "Ensure SSH is properly configured with key-based authentication and disable password authentication."
+      },
+      {
+        "title": "HTTP Service Detected",
+        "description": "Web server running on port 80",
+        "severity": "low",
+        "category": "Web Services",
+        "details": "HTTP web server detected. Consider redirecting HTTP traffic to HTTPS.",
+        "recommendation": "Configure HTTP to HTTPS redirect for better security."
+      },
+      {
+        "title": "SSL Certificate Issue",
+        "description": "SSL certificate is self-signed",
+        "severity": "medium",
+        "category": "SSL/TLS",
+        "details": "The SSL certificate is self-signed and not trusted by browsers.",
+        "recommendation": "Install a valid SSL certificate from a trusted Certificate Authority."
+      },
+      {
+        "title": "Outdated Web Server",
+        "description": "Web server version appears to be outdated",
+        "severity": "high",
+        "category": "Web Services",
+        "details": "The web server version contains known security vulnerabilities.",
+        "recommendation": "Update the web server to the latest stable version."
+      },
+      {
+        "title": "Critical Security Flaw",
+        "description": "Critical vulnerability in web application",
+        "severity": "critical",
+        "category": "Web Application",
+        "details": "A critical security vulnerability that could allow remote code execution.",
+        "recommendation": "Apply security patches immediately and consider taking the service offline until fixed."
+      }
+    ],
+    "version": "0.9.1",
+    "report_id": "APT-1754978218",
+    "branding": {
+      "company_name": "Comprehensive Test Co.",
+      "primary_color": "#059669"
+    }
+  }
+}

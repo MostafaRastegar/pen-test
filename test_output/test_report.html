@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Security Report</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 40px; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; }
+        .summary { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+        .stats { display: flex; justify-content: space-around; margin: 20px 0; }
+        .stat-item { text-align: center; }
+        .stat-number { font-size: 2em; font-weight: bold; }
+        .findings { margin-bottom: 30px; }
+        .finding { background: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; padding: 15px; }
+        .critical { border-left: 5px solid #dc3545; }
+        .high { border-left: 5px solid #fd7e14; }
+        .medium { border-left: 5px solid #ffc107; }
+        .low { border-left: 5px solid #28a745; }
+        .info { border-left: 5px solid #17a2b8; }
+        .severity { display: inline-block; padding: 4px 8px; border-radius: 4px; color: white; font-size: 12px; font-weight: bold; }
+        .footer { text-align: center; margin-top: 40px; padding: 20px; color: #666; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Test Security Report</h1>
+            <p>Report ID: APT-1754978218 | Generated: 2025-08-12 09:26:58</p>
+            <p>Target: test.example.com | Duration: 0:00:00</p>
+        </div>
+
+        <div class="summary">
+            <h2>Executive Summary</h2>
+            <p><strong>Overall Risk Level:</strong> <span style="color: #dc3545">Critical</span></p>
+
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-number" style="color: #dc3545">1</div>
+                    <div>Critical</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" style="color: #fd7e14">1</div>
+                    <div>High</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" style="color: #ffc107">1</div>
+                    <div>Medium</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" style="color: #28a745">1</div>
+                    <div>Low</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" style="color: #17a2b8">1</div>
+                    <div>Info</div>
+                </div>
+            </div>
+
+            <p><strong>Scanners Used:</strong> test_scanner</p>
+        </div>
+
+        <div class="findings">
+            <h2>Detailed Findings</h2>
+<h3>Network Services</h3>
+            <div class="finding info">
+                <h4>Open SSH Port</h4>
+                <span class="severity" style="background-color: #17a2b8">
+                    INFO
+                </span>
+                <p><strong>Description:</strong> SSH service is running on port 22</p>
+                <p><strong>Details:</strong> SSH (Secure Shell) service detected on port 22. This is normal for servers that require remote administration.</p>
+                <p><strong>Recommendation:</strong> Ensure SSH is properly configured with key-based authentication and disable password authentication.</p>
+            </div>
+<h3>Web Services</h3>
+            <div class="finding low">
+                <h4>HTTP Service Detected</h4>
+                <span class="severity" style="background-color: #28a745">
+                    LOW
+                </span>
+                <p><strong>Description:</strong> Web server running on port 80</p>
+                <p><strong>Details:</strong> HTTP web server detected. Consider redirecting HTTP traffic to HTTPS.</p>
+                <p><strong>Recommendation:</strong> Configure HTTP to HTTPS redirect for better security.</p>
+            </div>
+
+            <div class="finding high">
+                <h4>Outdated Web Server</h4>
+                <span class="severity" style="background-color: #fd7e14">
+                    HIGH
+                </span>
+                <p><strong>Description:</strong> Web server version appears to be outdated</p>
+                <p><strong>Details:</strong> The web server version contains known security vulnerabilities.</p>
+                <p><strong>Recommendation:</strong> Update the web server to the latest stable version.</p>
+            </div>
+<h3>SSL/TLS</h3>
+            <div class="finding medium">
+                <h4>SSL Certificate Issue</h4>
+                <span class="severity" style="background-color: #ffc107">
+                    MEDIUM
+                </span>
+                <p><strong>Description:</strong> SSL certificate is self-signed</p>
+                <p><strong>Details:</strong> The SSL certificate is self-signed and not trusted by browsers.</p>
+                <p><strong>Recommendation:</strong> Install a valid SSL certificate from a trusted Certificate Authority.</p>
+            </div>
+<h3>Web Application</h3>
+            <div class="finding critical">
+                <h4>Critical Security Flaw</h4>
+                <span class="severity" style="background-color: #dc3545">
+                    CRITICAL
+                </span>
+                <p><strong>Description:</strong> Critical vulnerability in web application</p>
+                <p><strong>Details:</strong> A critical security vulnerability that could allow remote code execution.</p>
+                <p><strong>Recommendation:</strong> Apply security patches immediately and consider taking the service offline until fixed.</p>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            <p>Generated by Auto-Pentest Framework v0.9.1</p>
+            <p>This report contains confidential information and should be handled accordingly.</p>
+            <p><em>Disclaimer:</em> This automated scan provides initial security insights.
+            Manual testing and expert review are recommended for comprehensive security evaluation.</p>
+        </div>
+    </div>
+</body>
+</html>

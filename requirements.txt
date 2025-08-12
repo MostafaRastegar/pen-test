@@ -19,6 +19,15 @@ jinja2>=3.0.0
 # Validation
 validators>=0.18.0
 
+# PDF Generation (Choose one)
+weasyprint>=60.0          # Recommended for better CSS support
+# OR
+# pdfkit>=1.0.0           # Alternative (requires wkhtmltopdf system package)
+
+# Optional: Chart generation for advanced reports
+# plotly>=5.0.0           # For interactive charts
+# matplotlib>=3.5.0       # For static charts
+
 # Testing
 pytest>=7.0.0
 pytest-cov>=3.0.0
@@ -26,3 +35,7 @@ pytest-cov>=3.0.0
 # Linting & Formatting
 black>=22.0.0
 flake8>=4.0.0
+
+# Development tools
+pre-commit>=2.20.0        # Git hooks for code quality
+bandit>=1.7.0             # Security linting

@@ -315,6 +315,9 @@ class InputValidator:
         """Initialize validator"""
         self.logger = logging.getLogger("InputValidator")
 
+    def is_valid_target(self, target: str) -> str:
+        return target
+
     def validate_target(self, target: str) -> Tuple[bool, str, str]:
         """
         Validate and identify target type

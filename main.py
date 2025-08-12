@@ -24,6 +24,9 @@ from src.orchestrator import (
     create_web_workflow,
     ScanWorkflow,
 )
+from src.orchestrator.workflow import WorkflowStatus
+from src.core.scanner_base import ScanStatus
+
 from src.utils.reporter import ReportGenerator, generate_comprehensive_report
 from src.utils.logger import (
     LoggerSetup,
@@ -32,6 +35,7 @@ from src.utils.logger import (
     log_error,
     log_info,
     log_warning,
+    log_debug,
 )
 from config.settings import OUTPUT_DIR, REPORT_DIR, SCAN_PROFILES
 
@@ -75,66 +79,51 @@ def cli(debug, quiet):
 @click.argument("target")
 @click.option(
     "--profile",
+    "-p",
     type=click.Choice(["quick", "full", "web"]),
     default="quick",
     help="Scan profile to use",
 )
-@click.option("--parallel/--sequential", default=False, help="Run scanners in parallel")
-@click.option("--timeout", type=int, default=300, help="Scan timeout per scanner")
-@click.option("--include-port/--no-port", default=True, help="Include port scanning")
-@click.option("--include-dns/--no-dns", default=False, help="Include DNS enumeration")
-@click.option("--include-web/--no-web", default=False, help="Include web scanning")
-@click.option(
-    "--include-directory/--no-directory",
-    default=False,
-    help="Include directory enumeration",
-)
-@click.option("--include-ssl/--no-ssl", default=False, help="Include SSL/TLS analysis")
-@click.option("--ports", help="Ports to scan (e.g., 22,80,443 or 1-1000)")
-@click.option(
-    "--output", type=click.Path(), help="Base output filename (without extension)"
-)
-@click.option("--html-report/--no-html", default=False, help="Generate HTML report")
-@click.option("--pdf-report/--no-pdf", default=False, help="Generate PDF report")
-@click.option(
-    "--exec-summary/--no-summary", default=False, help="Generate executive summary"
-)
+@click.option("--timeout", "-t", default=300, help="Timeout per scanner (seconds)")
+@click.option("--parallel", is_flag=True, default=True, help="Run scanners in parallel")
+@click.option("--sequential", is_flag=True, help="Run scanners sequentially")
+@click.option("--ports", help="Custom port range (e.g., 1-1000, 80,443)")
+@click.option("--include-port", is_flag=True, default=True, help="Include port scanner")
+@click.option("--include-dns", is_flag=True, help="Include DNS scanner")
+@click.option("--include-web", is_flag=True, help="Include web scanner")
+@click.option("--include-directory", is_flag=True, help="Include directory scanner")
+@click.option("--include-ssl", is_flag=True, help="Include SSL scanner")
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
+@click.option("--pdf-report", is_flag=True, help="Generate PDF report")
+@click.option("--json-report", is_flag=True, help="Generate JSON report")
+@click.option("--all-reports", is_flag=True, help="Generate all report formats")
+@click.option("--custom-branding", help="Path to custom branding JSON file")
 @click.option(
     "--compliance-report",
-    type=click.Choice(["pci_dss", "nist", "iso27001"]),
-    help="Generate compliance-specific report",
-)
-@click.option(
-    "--custom-branding",
-    type=click.Path(exists=True),
-    help="JSON file with custom branding options",
-)
-@click.option(
-    "--all-reports",
-    is_flag=True,
-    help="Generate all report formats (HTML, PDF, Executive)",
+    type=click.Choice(["pci_dss", "owasp", "nist"]),
+    help="Generate compliance report",
 )
 def scan(
     target,
     profile,
-    parallel,
     timeout,
+    parallel,
+    sequential,
+    ports,
     include_port,
     include_dns,
     include_web,
     include_directory,
     include_ssl,
-    ports,
-    output,
     html_report,
     pdf_report,
-    exec_summary,
-    compliance_report,
-    custom_branding,
+    json_report,
     all_reports,
+    custom_branding,
+    compliance_report,
 ):
     """
-    Perform orchestrated security scan with enhanced reporting.
+    Execute comprehensive security scan against target.
 
     TARGET can be a URL, domain name, or IP address.
 
@@ -165,186 +154,229 @@ def scan(
 
         sanitized_target = target.replace("://", "_").replace("/", "_")
 
-        # Create orchestrated workflow
-        if profile == "quick":
-            workflow = create_quick_workflow(timeout=timeout)
-        elif profile == "full":
-            workflow = create_full_workflow(timeout=timeout)
-        elif profile == "web":
-            workflow = create_web_workflow(timeout=timeout)
-        else:
-            # Custom workflow based on individual scanner options
-            workflow = ScanWorkflow(parallel=parallel)
+        # Determine execution mode
+        if sequential:
+            parallel = False
 
-            if include_port:
-                port_scanner = PortScanner()
-                scan_options = {}
-                if ports:
-                    scan_options["ports"] = ports
-                workflow.add_scanner(port_scanner, scan_options)
+        # Create workflow with proper error handling
+        workflow = None
+        try:
+            if profile in ["quick", "full", "web"]:
+                # Create standard workflow
+                if profile == "quick":
+                    workflow = create_quick_workflow(target)
+                elif profile == "full":
+                    workflow = create_full_workflow(target)
+                elif profile == "web":
+                    workflow = create_web_workflow(target)
 
-            if include_dns:
-                dns_scanner = DNSScanner()
-                workflow.add_scanner(dns_scanner, {})
+                # Set timeout for all tasks
+                if workflow and hasattr(workflow, "tasks"):
+                    for task in workflow.tasks:
+                        if hasattr(task, "timeout"):
+                            task.timeout = timeout
+            else:
+                # Custom workflow based on individual scanner options
+                from datetime import datetime
 
-            if include_web:
-                web_scanner = WebScanner()
-                workflow.add_scanner(web_scanner, {})
+                workflow = ScanWorkflow(f"custom_{int(datetime.now().timestamp())}")
 
-            if include_directory:
-                dir_scanner = DirectoryScanner()
-                workflow.add_scanner(dir_scanner, {})
+                # Add scanners based on options
+                if include_port:
+                    workflow.add_scan_task(
+                        "port_scanner",
+                        target,
+                        options={"ports": ports} if ports else {},
+                        timeout=timeout,
+                    )
 
-            if include_ssl:
-                ssl_scanner = SSLScanner()
-                workflow.add_scanner(ssl_scanner, {})
+                if include_dns:
+                    workflow.add_scan_task("dns_scanner", target, timeout=timeout)
 
-        # Execute scan
-        log_info(f"Starting {'parallel' if parallel else 'sequential'} scan...")
-        log_info(f"Profile: {profile}")
-        log_info(f"Scanners: {len(workflow.scanners)}")
+                if include_web:
+                    workflow.add_scan_task("web_scanner", target, timeout=timeout)
 
-        all_results = workflow.execute(target)
+                if include_directory:
+                    workflow.add_scan_task("directory_scanner", target, timeout=timeout)
 
-        if not all_results:
-            log_error("No scan results available. Check your target and options.")
+                if include_ssl:
+                    workflow.add_scan_task("ssl_scanner", target, timeout=timeout)
+
+        except Exception as e:
+            log_error(f"Failed to create workflow: {e}")
             sys.exit(1)
 
-        # Display results
-        for result in all_results:
-            display_scan_results(result)
-            print()
+        if not workflow:
+            log_error("No workflow created. Check your parameters.")
+            sys.exit(1)
 
-        # Generate reports
-        if all_reports:
-            html_report = True
-            pdf_report = True
-            exec_summary = True
-
-        if any([html_report, pdf_report, exec_summary, compliance_report]):
-            log_banner("Generating Reports", "bold yellow")
-
-            # Prepare output directory
-            if output:
-                base_name = Path(output).stem
-                output_dir = Path(output).parent
-            else:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                base_name = f"security_report_{sanitized_target}_{timestamp}"
-                output_dir = REPORT_DIR
-
-            output_dir.mkdir(parents=True, exist_ok=True)
-
-            # Initialize reporter with custom branding
-            reporter = ReportGenerator(branding=branding)
-            generated_files = {}
-
-            # HTML Report
-            if html_report:
-                html_path = output_dir / f"{base_name}.html"
-                if reporter.generate_html_report(all_results, html_path):
-                    generated_files["html"] = html_path
-                    log_success(f"📄 HTML report: {html_path}")
-
-            # PDF Report
-            if pdf_report:
-                pdf_path = output_dir / f"{base_name}.pdf"
-                if reporter.generate_pdf_report(all_results, pdf_path):
-                    generated_files["pdf"] = pdf_path
-                    log_success(f"📑 PDF report: {pdf_path}")
-                else:
-                    log_warning(
-                        "PDF generation failed. Install 'weasyprint' or 'pdfkit' for PDF support"
-                    )
-
-            # Executive Summary
-            if exec_summary:
-                exec_path = output_dir / f"{base_name}_executive_summary.txt"
-                if reporter.generate_executive_summary(all_results, exec_path):
-                    generated_files["executive"] = exec_path
-                    log_success(f"📋 Executive summary: {exec_path}")
-
-            # Compliance Report
-            if compliance_report:
-                compliance_path = (
-                    output_dir / f"{base_name}_compliance_{compliance_report}.html"
-                )
-                if reporter.generate_compliance_report(
-                    all_results, compliance_path, compliance_report
-                ):
-                    generated_files["compliance"] = compliance_path
-                    log_success(
-                        f"📊 Compliance report ({compliance_report}): {compliance_path}"
-                    )
-
-            # JSON Report (always generate)
-            json_path = output_dir / f"{base_name}.json"
-            if reporter.generate_json_report(all_results, json_path):
-                generated_files["json"] = json_path
-                log_success(f"📄 JSON report: {json_path}")
-
-            # Report summary
-            log_banner("Report Summary", "bold green")
-            log_info(f"Total files generated: {len(generated_files)}")
-            for report_type, file_path in generated_files.items():
-                log_info(f"{report_type.upper()}: {file_path.name}")
-
-        # Combined results for JSON output (if no reporting)
-        else:
-            # Save combined JSON results
-            if output:
-                output_path = Path(output)
-            else:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"scan_{sanitized_target}_{timestamp}.json"
-                output_path = REPORT_DIR / filename
-
-            # Combine results
-            main_result = all_results[0]
-            for result in all_results[1:]:
-                main_result.findings.extend(result.findings)
-                for key, value in result.metadata.items():
-                    if key in main_result.metadata:
-                        main_result.metadata[f"{result.scanner_name}_{key}"] = value
-                    else:
-                        main_result.metadata[key] = value
-
-            main_result.save_to_file(output_path)
-            log_success(f"Results saved to: {output_path}")
-
-        # Scan summary
-        log_banner("Scan Summary", "bold green")
+        # Execute workflow
+        log_info(f"Starting {'parallel' if parallel else 'sequential'} scan...")
+        log_info(f"Profile: {profile}")
         log_info(f"Target: {target}")
-        log_info(f"Scanners used: {len(all_results)}")
+        log_info(f"Timeout: {timeout}s per scanner")
+        log_info(f"Tasks: {len(getattr(workflow, 'tasks', []))}")
 
-        total_findings = sum(len(result.findings) for result in all_results)
-        log_info(f"Total findings: {total_findings}")
+        try:
+            # Execute workflow and get WorkflowResult
+            workflow_result = workflow.execute(parallel=parallel, fail_fast=False)
 
-        # Count findings by severity
-        severity_counts = {}
-        for result in all_results:
-            for finding in result.findings:
-                sev = finding.get("severity", "unknown")
-                severity_counts[sev] = severity_counts.get(sev, 0) + 1
+            if not workflow_result:
+                log_error("Workflow execution failed - no result returned")
+                sys.exit(1)
 
-        for severity, count in severity_counts.items():
-            if count > 0:
-                log_info(f"{severity.title()}: {count}")
+            # Process WorkflowResult properly
+            all_results = []
+            total_findings = 0
 
-        # Check for errors
-        total_errors = sum(len(result.errors) for result in all_results)
-        if total_errors > 0:
-            log_warning(f"Errors encountered: {total_errors}")
+            # Check workflow status
+            if workflow_result.status == WorkflowStatus.COMPLETED:
+                log_success("Workflow completed successfully!")
+
+                # Collect results from successful tasks
+                successful_tasks = 0
+                failed_tasks = 0
+
+                for task in workflow_result.tasks:
+                    if task.status == ScanStatus.COMPLETED and task.result:
+                        all_results.append(task.result)
+                        successful_tasks += 1
+                        if hasattr(task.result, "findings") and task.result.findings:
+                            total_findings += len(task.result.findings)
+                    elif task.status == ScanStatus.FAILED:
+                        failed_tasks += 1
+                        log_warning(f"Task {task.scanner_name} failed: {task.error}")
+
+                # Also use aggregated result if available
+                if workflow_result.aggregated_result:
+                    all_results.append(workflow_result.aggregated_result)
+                    if hasattr(workflow_result.aggregated_result, "findings"):
+                        total_findings = len(workflow_result.aggregated_result.findings)
+
+                log_info(f"Successful tasks: {successful_tasks}")
+                log_info(f"Failed tasks: {failed_tasks}")
+
+            elif workflow_result.status == WorkflowStatus.FAILED:
+                log_error("Workflow failed!")
+
+                # Try to get partial results
+                for task in workflow_result.tasks:
+                    if task.status == ScanStatus.COMPLETED and task.result:
+                        all_results.append(task.result)
+                        if hasattr(task.result, "findings") and task.result.findings:
+                            total_findings += len(task.result.findings)
+
+                if all_results:
+                    log_info(
+                        f"Partial results available: {len(all_results)} successful scans"
+                    )
+
+            # Check if we have any results
+            if not all_results:
+                log_error("No scan results available. All scanners failed.")
+                log_info("Check your target accessibility and tool configurations.")
+                sys.exit(1)
+
+            log_info(f"Total findings collected: {total_findings}")
+
+            # Generate reports if requested
+            report_generated = False
+
+            if html_report or pdf_report or json_report or all_reports:
+                try:
+                    from datetime import datetime
+
+                    # Use the correct generate_comprehensive_report signature
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    report_name = f"scan_report_{sanitized_target}_{timestamp}"
+
+                    # Call with correct parameters
+                    generated_files = generate_comprehensive_report(
+                        results=all_results,  # List of ScanResult objects
+                        output_dir=REPORT_DIR,  # Path object
+                        report_name=report_name,  # String
+                        include_pdf=(pdf_report or all_reports),  # Boolean
+                        branding=branding,  # Dict or None
+                    )
+
+                    # Report success for generated files
+                    for report_type, file_path in generated_files.items():
+                        if file_path and file_path.exists():
+                            log_success(f"{report_type.upper()} report: {file_path}")
+                            report_generated = True
+                        else:
+                            log_warning(
+                                f"{report_type.upper()} report generation failed"
+                            )
+
+                    # If no files were generated, try alternative approach
+                    if not generated_files and all_results:
+                        log_info("Trying alternative report generation...")
+
+                        try:
+                            # Create ReportGenerator directly
+                            reporter = ReportGenerator(branding=branding)
+
+                            # Generate individual reports
+                            if html_report or all_reports:
+                                html_file = REPORT_DIR / f"{report_name}.html"
+                                if reporter.generate_html_report(
+                                    all_results, html_file
+                                ):
+                                    log_success(f"HTML report: {html_file}")
+                                    report_generated = True
+
+                            if json_report or all_reports:
+                                json_file = REPORT_DIR / f"{report_name}.json"
+                                if reporter.generate_json_report(
+                                    all_results, json_file
+                                ):
+                                    log_success(f"JSON report: {json_file}")
+                                    report_generated = True
+
+                            if pdf_report or all_reports:
+                                pdf_file = REPORT_DIR / f"{report_name}.pdf"
+                                if reporter.generate_pdf_report(all_results, pdf_file):
+                                    log_success(f"PDF report: {pdf_file}")
+                                    report_generated = True
+
+                        except Exception as e:
+                            log_warning(f"Alternative report generation failed: {e}")
+
+                except Exception as e:
+                    log_warning(f"Report generation failed: {e}")
+                    log_debug(f"Report error details: {str(e)}")
+
+            # Display summary
+            log_success("=== SCAN SUMMARY ===")
+            log_info(f"Target: {target}")
+            log_info(f"Profile: {profile}")
+            log_info(f"Execution Mode: {'Parallel' if parallel else 'Sequential'}")
+            log_info(f"Total Scanners: {len(workflow_result.tasks)}")
+            log_info(
+                f"Successful: {len([t for t in workflow_result.tasks if t.status == ScanStatus.COMPLETED])}"
+            )
+            log_info(
+                f"Failed: {len([t for t in workflow_result.tasks if t.status == ScanStatus.FAILED])}"
+            )
+            log_info(f"Total Findings: {total_findings}")
+
+            if report_generated:
+                log_info(f"Reports saved to: {REPORT_DIR}")
+
+            log_success("Scan completed successfully!")
+
+        except Exception as e:
+            log_error(f"Scan execution failed: {e}")
+            log_debug(f"Error details: {str(e)}")
+            sys.exit(1)
 
     except KeyboardInterrupt:
         log_warning("Scan interrupted by user")
         sys.exit(1)
     except Exception as e:
-        log_error(f"Scan failed: {e}")
-        if logger.level <= 10:  # DEBUG level
-            import traceback
-
-            traceback.print_exc()
+        log_error(f"Unexpected error: {e}")
+        log_debug(f"Error details: {str(e)}")
         sys.exit(1)
 
 

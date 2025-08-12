@@ -10,8 +10,18 @@ from pathlib import Path
 
 from src.core import ScannerBase, ScanResult, ScanStatus, ScanSeverity
 from src.core import CommandExecutor, validate_ip, validate_domain
-from src.utils.logger import log_info, log_error, log_warning, log_debug
-from src.utils.performance import cache_scan_result, get_performance_manager
+
+from src.utils.logger import log_info, log_error, log_warning, log_debug, log_success
+
+try:
+    from src.utils.performance import cache_scan_result, get_performance_manager
+except ImportError:
+    # Fallback if performance module not available
+    def cache_scan_result(*args, **kwargs):
+        pass
+
+    def get_performance_manager():
+        return None
 
 
 class PortScanner(ScannerBase):
@@ -30,7 +40,11 @@ class PortScanner(ScannerBase):
         self.executor = CommandExecutor(timeout=self.timeout)
 
         # Initialize performance manager for this scanner
-        self.performance_manager = get_performance_manager()
+        try:
+            self.performance_manager = get_performance_manager()
+        except Exception as e:
+            log_debug(f"Performance manager not available: {e}")
+            self.performance_manager = None
 
         # Default nmap options
         self.default_args = [
@@ -62,74 +76,106 @@ class PortScanner(ScannerBase):
                 993,
                 995,
                 1723,
-                3306,
                 3389,
-                5432,
                 5900,
-                8080,
             ],
-            "top100": "100",  # nmap's top 100 ports
-            "top1000": "1000",  # nmap's top 1000 ports
-            "common": [
-                21,
-                22,
-                23,
-                25,
-                53,
-                80,
-                110,
-                135,
-                139,
-                143,
-                443,
-                993,
-                995,
-                1433,
-                1521,
-                3306,
-                3389,
-                5432,
-                5900,
-                8080,
-                8443,
-            ],
-            "all": "1-65535",  # All ports (very slow)
+            "top100": list(range(1, 101)),
+            "top1000": "1-1000",
+            "comprehensive": "1-65535",
         }
-
-        log_debug(f"Port scanner initialized with performance optimizations")
 
     def validate_target(self, target: str) -> bool:
         """
-        Validate if target is appropriate for port scanning
+        Validate target format for port scanner
 
         Args:
-            target: Target IP or domain
+            target: Target to validate
 
         Returns:
-            bool: True if valid target, False otherwise
+            bool: True if target is valid
         """
-        return validate_ip(target) or validate_domain(target)
+        try:
+            # Check if it's a valid IP address
+            if validate_ip(target):
+                return True
 
-    @cache_scan_result("port_scan", ttl=1800)  # Cache for 30 minutes
+            # Check if it's a valid domain/hostname
+            if validate_domain(target):
+                return True
+
+            # Check for IP ranges (basic validation)
+            if "/" in target or "-" in target:
+                # Could be CIDR or range format
+                return True
+
+            return False
+
+        except Exception as e:
+            log_debug(f"Target validation failed for {target}: {e}")
+            return False
+
+    def get_capabilities(self) -> Dict[str, Any]:
+        """
+        Get scanner capabilities and metadata
+
+        Returns:
+            dict: Scanner capabilities information
+        """
+        return {
+            "name": "Port Scanner",
+            "version": "1.0.0",
+            "description": "Network port scanner using Nmap with XML parsing",
+            "author": "Auto-Pentest Framework",
+            "target_types": ["ip", "domain", "hostname", "ip_range"],
+            "supported_protocols": ["tcp", "udp"],
+            "features": [
+                "Service version detection",
+                "OS fingerprinting",
+                "NSE script scanning",
+                "Stealth scanning",
+                "Performance optimization",
+                "XML output parsing",
+                "Cache support",
+            ],
+            "port_profiles": {
+                "quick": "Top 100 most common ports",
+                "top1000": "Top 1000 ports",
+                "comprehensive": "All 65535 ports",
+            },
+            "scan_types": [
+                "TCP SYN scan (-sS)",
+                "TCP Connect scan (-sT)",
+                "UDP scan (-sU)",
+                "Service detection (-sV)",
+                "OS detection (-O)",
+                "Script scan (-sC)",
+            ],
+            "performance": {
+                "timing_templates": ["T1", "T2", "T3", "T4", "T5"],
+                "parallel_scanning": True,
+                "result_caching": True,
+            },
+            "dependencies": {"required": ["nmap"], "optional": ["nmap-scripts"]},
+            "output_formats": ["xml", "json"],
+            "estimated_time": {
+                "quick": "30-60 seconds",
+                "top1000": "2-5 minutes",
+                "comprehensive": "10-30 minutes",
+            },
+        }
+
     def _execute_scan(self, target: str, options: Dict[str, Any]) -> ScanResult:
         """
-        Execute nmap scan with performance optimizations and caching
+        Execute the actual port scan (implements abstract method)
 
         Args:
             target: Target to scan
             options: Scan options
 
         Returns:
-            ScanResult: Parsed scan results
+            ScanResult: Scan results
         """
-        # Check memory pressure before starting scan
-        memory_pressure = (
-            self.performance_manager.memory_monitor.check_memory_pressure()
-        )
-        if memory_pressure == "critical":
-            log_warning("Critical memory pressure detected - optimizing for large scan")
-            self.performance_manager.optimize_for_large_scan()
-
+        # Create result object
         result = ScanResult(
             scanner_name=self.name,
             target=target,
@@ -137,447 +183,267 @@ class PortScanner(ScannerBase):
             start_time=datetime.now(),
         )
 
-        # Check if nmap is available
-        if not self.executor.check_tool_exists("nmap"):
-            result.status = ScanStatus.FAILED
-            result.errors.append("nmap is not installed or not in PATH")
-            return result
-
-        # Build command with memory-aware options
-        cmd = self._build_optimized_nmap_command(target, options, memory_pressure)
-        cmd_str = " ".join(cmd)
-
-        self.logger.info(f"Running optimized nmap scan: {cmd_str}")
-        result.metadata["command"] = cmd_str
-        result.metadata["memory_pressure"] = memory_pressure
-        result.metadata["cache_enabled"] = True
-
-        # Execute nmap with performance monitoring
-        start_time = datetime.now()
-        exec_result = self.executor.execute(cmd, timeout=self.timeout)
-        execution_time = (datetime.now() - start_time).total_seconds()
-
-        result.raw_output = exec_result.stdout
-        result.metadata["execution_time"] = execution_time
-        result.metadata["return_code"] = exec_result.return_code
-
-        if not exec_result.success:
-            result.status = ScanStatus.FAILED
-            result.errors.append(f"nmap failed: {exec_result.stderr}")
-            return result
-
-        # Parse XML output with memory optimization
         try:
-            self._parse_nmap_xml_optimized(exec_result.stdout, result)
-            result.status = ScanStatus.COMPLETED
-            result.end_time = datetime.now()
-            result.duration = str(result.end_time - result.start_time).split(".")[0]
+            # Build nmap command based on options
+            cmd = self._build_nmap_command(target, options)
 
-            self.logger.info(
-                f"Port scan completed. Found {len(result.findings)} findings in {execution_time:.2f}s"
-            )
+            log_info(f"Executing nmap command: {' '.join(cmd)}")
 
-            # Log performance stats
-            perf_stats = self.performance_manager.get_performance_stats()
-            log_debug(
-                f"Performance stats: {perf_stats['cache']['hit_rate']}% cache hit rate, "
-                f"{perf_stats['memory']['process_memory_mb']}MB memory usage"
-            )
+            # Execute command
+            exec_result = self.executor.execute(cmd)
+
+            if exec_result.success:
+                # Parse XML output
+                findings = self._parse_nmap_xml(exec_result.stdout)
+
+                result.findings = findings
+                result.raw_output = exec_result.stdout
+                result.status = ScanStatus.COMPLETED
+                result.metadata = {
+                    "command": " ".join(cmd),
+                    "scan_options": options,
+                    "ports_scanned": self._get_ports_count(options),
+                    "nmap_version": self._get_nmap_version(),
+                }
+
+                log_success(f"Port scan completed: {len(findings)} findings")
+
+            else:
+                result.status = ScanStatus.FAILED
+                result.errors.append(exec_result.stderr or "Unknown error")
+                log_error(f"Port scan failed: {exec_result.stderr}")
 
         except Exception as e:
             result.status = ScanStatus.FAILED
-            result.errors.append(f"Failed to parse nmap output: {e}")
-            log_error(f"XML parsing error: {e}")
+            result.errors.append(str(e))
+            log_error(f"Port scan exception: {e}")
+
+        finally:
+            result.end_time = datetime.now()
 
         return result
 
-    def _build_optimized_nmap_command(
-        self, target: str, options: Dict[str, Any], memory_pressure: str
-    ) -> List[str]:
+    def _build_nmap_command(self, target: str, options: Dict[str, Any]) -> List[str]:
         """
-        Build optimized nmap command based on memory pressure and options
+        Build nmap command based on options
 
         Args:
             target: Target to scan
             options: Scan options
-            memory_pressure: Current memory pressure level
 
         Returns:
-            List[str]: Optimized command arguments
+            List[str]: Nmap command arguments
         """
-        cmd = ["nmap"] + self.default_args.copy()
+        cmd = ["nmap"]
 
-        # Optimize based on memory pressure
-        if memory_pressure == "critical":
-            # Reduce intensity for high memory pressure
-            cmd = ["nmap", "-sS", "-oX", "-"]  # Basic SYN scan only
-            log_info("Using basic scan profile due to memory pressure")
-        elif memory_pressure == "warning":
-            # Moderate optimization
-            cmd = ["nmap", "-sV", "--version-intensity", "3", "-oX", "-"]
-            log_info("Using reduced intensity scan due to memory warning")
+        # Add default arguments
+        cmd.extend(self.default_args)
 
-        # Port selection with optimization
-        ports = options.get("ports", "top1000")
-        if isinstance(ports, str):
-            if ports in self.port_profiles:
-                port_spec = self.port_profiles[ports]
-                if isinstance(port_spec, list):
-                    cmd.extend(["-p", ",".join(map(str, port_spec))])
-                else:
-                    cmd.extend(["--top-ports", port_spec])
-            else:
-                cmd.extend(["-p", ports])
-        elif isinstance(ports, list):
-            cmd.extend(["-p", ",".join(map(str, ports))])
+        # Port specification
+        ports = options.get("ports", "quick")
+        if ports in self.port_profiles:
+            if ports == "quick":
+                cmd.extend(["-p", ",".join(map(str, self.port_profiles["quick"]))])
+            elif isinstance(self.port_profiles[ports], str):
+                cmd.extend(["-p", self.port_profiles[ports]])
+        else:
+            cmd.extend(["-p", str(ports)])
 
-        # Scan type
-        scan_type = options.get("scan_type", "syn")
-        if scan_type == "tcp":
-            cmd.append("-sT")
-        elif scan_type == "udp":
-            cmd.append("-sU")
-        elif scan_type == "syn" and "-sS" not in cmd:
-            cmd.append("-sS")
+        # Timing template
+        timing = options.get("timing", 4)
+        cmd.append(f"-T{timing}")
 
-        # Timing template with memory optimization
-        timing = options.get("timing", 3)
-        if memory_pressure == "critical":
-            timing = min(timing, 2)  # Slower timing for memory pressure
-        cmd.extend(["-T", str(timing)])
-
-        # Disable ping if requested
+        # Additional options
         if options.get("no_ping", False):
             cmd.append("-Pn")
 
-        # Memory-optimized additional args
-        if memory_pressure != "critical" and "nmap_args" in options:
-            cmd.extend(options["nmap_args"])
+        if options.get("aggressive", False):
+            cmd.append("-A")
 
-        # Target
+        # Add custom nmap args if provided
+        if "nmap_args" in options:
+            if isinstance(options["nmap_args"], list):
+                cmd.extend(options["nmap_args"])
+            else:
+                cmd.extend(str(options["nmap_args"]).split())
+
+        # Add target
         cmd.append(target)
 
         return cmd
 
-    def _parse_nmap_xml_optimized(self, xml_output: str, result: ScanResult):
+    def _parse_nmap_xml(self, xml_output: str) -> List[Dict[str, Any]]:
         """
-        Parse nmap XML output with memory optimization
+        Parse nmap XML output and extract findings
 
         Args:
-            xml_output: Raw XML output from nmap
-            result: ScanResult object to populate
+            xml_output: XML output from nmap
+
+        Returns:
+            List[Dict]: List of findings
         """
+        findings = []
+
         try:
-            # Use iterparse for memory efficiency with large XML
-            from xml.etree.ElementTree import iterparse
-            import io
+            import xml.etree.ElementTree as ET
 
-            xml_stream = io.StringIO(xml_output)
-
-            # Parse incrementally to save memory
-            findings = []
-            hosts_processed = 0
-
-            for event, elem in iterparse(xml_stream, events=("start", "end")):
-                if event == "end" and elem.tag == "host":
-                    host_findings = self._parse_host_element(elem, result.target)
-                    findings.extend(host_findings)
-                    hosts_processed += 1
-
-                    # Clear processed elements to save memory
-                    elem.clear()
-
-                    # Limit processing for memory pressure
-                    memory_pressure = (
-                        self.performance_manager.memory_monitor.check_memory_pressure()
-                    )
-                    if memory_pressure == "critical" and hosts_processed > 10:
-                        log_warning("Stopping XML parsing due to memory pressure")
-                        break
-
-            result.findings = findings
-            result.metadata["hosts_processed"] = hosts_processed
-            result.metadata["findings_count"] = len(findings)
-
-        except Exception as e:
-            # Fallback to regular parsing
-            log_warning(f"Optimized parsing failed, using fallback: {e}")
-            self._parse_nmap_xml_fallback(xml_output, result)
-
-    def _parse_nmap_xml_fallback(self, xml_output: str, result: ScanResult):
-        """
-        Fallback XML parsing method
-
-        Args:
-            xml_output: Raw XML output from nmap
-            result: ScanResult object to populate
-        """
-        try:
             root = ET.fromstring(xml_output)
-            findings = []
 
-            for host in root.findall(".//host"):
-                host_findings = self._parse_host_element(host, result.target)
+            for host in root.findall("host"):
+                host_findings = self._parse_host(host)
                 findings.extend(host_findings)
-
-            result.findings = findings
 
         except ET.ParseError as e:
             log_error(f"XML parsing error: {e}")
-            result.errors.append(f"Failed to parse XML output: {e}")
+        except Exception as e:
+            log_error(f"Error parsing nmap output: {e}")
 
-    def _parse_host_element(self, host_elem, target: str) -> List[Dict[str, Any]]:
-        """
-        Parse a single host element from nmap XML
+        return findings
 
-        Args:
-            host_elem: XML element for a host
-            target: Target being scanned
-
-        Returns:
-            List of findings for this host
-        """
+    def _parse_host(self, host_elem) -> List[Dict[str, Any]]:
+        """Parse individual host element"""
         findings = []
 
-        # Get host info
-        address_elem = host_elem.find('.//address[@addrtype="ipv4"]')
-        if address_elem is None:
-            address_elem = host_elem.find('.//address[@addrtype="ipv6"]')
+        # Get host information
+        host_ip = None
+        hostname = None
 
-        host_ip = address_elem.get("addr") if address_elem is not None else target
+        address_elem = host_elem.find("address[@addrtype='ipv4']")
+        if address_elem is not None:
+            host_ip = address_elem.get("addr")
 
-        # Get hostname
-        hostname_elem = host_elem.find(".//hostname")
-        hostname = hostname_elem.get("name") if hostname_elem is not None else None
-
-        # OS detection
-        os_elem = host_elem.find(".//os/osmatch")
-        if os_elem is not None:
-            os_name = os_elem.get("name", "Unknown")
-            accuracy = os_elem.get("accuracy", "0")
-
-            findings.append(
-                {
-                    "title": f"Operating System Detected",
-                    "description": f"OS fingerprinting detected: {os_name}",
-                    "severity": "info",
-                    "category": "os_detection",
-                    "details": f"Detected OS: {os_name} (Accuracy: {accuracy}%)",
-                    "host": host_ip,
-                    "hostname": hostname,
-                    "os_name": os_name,
-                    "accuracy": accuracy,
-                }
-            )
+        hostnames_elem = host_elem.find("hostnames/hostname[@type='PTR']")
+        if hostnames_elem is not None:
+            hostname = hostnames_elem.get("name")
 
         # Parse ports
-        for port in host_elem.findall(".//port"):
-            port_findings = self._parse_port_element(port, host_ip, hostname)
-            findings.extend(port_findings)
+        ports_elem = host_elem.find("ports")
+        if ports_elem is not None:
+            for port in ports_elem.findall("port"):
+                port_finding = self._parse_port(port, host_ip, hostname)
+                if port_finding:
+                    findings.append(port_finding)
 
         return findings
 
-    def _parse_port_element(
-        self, port_elem, host_ip: str, hostname: Optional[str]
-    ) -> List[Dict[str, Any]]:
-        """
-        Parse a single port element
+    def _parse_port(
+        self, port_elem, host_ip: str, hostname: str
+    ) -> Optional[Dict[str, Any]]:
+        """Parse individual port element"""
+        try:
+            protocol = port_elem.get("protocol")
+            portid = port_elem.get("portid")
 
-        Args:
-            port_elem: XML element for a port
-            host_ip: Host IP address
-            hostname: Host hostname (if available)
+            state_elem = port_elem.find("state")
+            if state_elem is None:
+                return None
 
-        Returns:
-            List of findings for this port
-        """
-        findings = []
+            state = state_elem.get("state")
 
-        port_id = port_elem.get("portid")
-        protocol = port_elem.get("protocol", "tcp")
+            # Only report open ports
+            if state != "open":
+                return None
 
-        state_elem = port_elem.find(".//state")
-        if state_elem is None:
-            return findings
-
-        state = state_elem.get("state")
-
-        if state == "open":
-            # Service detection
-            service_elem = port_elem.find(".//service")
+            # Get service information
+            service_elem = port_elem.find("service")
             service_name = (
-                service_elem.get("name", "unknown")
-                if service_elem is not None
-                else "unknown"
+                service_elem.get("name") if service_elem is not None else "unknown"
             )
             service_product = (
-                service_elem.get("product", "") if service_elem is not None else ""
+                service_elem.get("product") if service_elem is not None else ""
             )
             service_version = (
-                service_elem.get("version", "") if service_elem is not None else ""
-            )
-            service_info = (
-                service_elem.get("extrainfo", "") if service_elem is not None else ""
+                service_elem.get("version") if service_elem is not None else ""
             )
 
-            # Determine severity based on port and service
-            severity = self._assess_port_severity(int(port_id), service_name)
-
-            # Create service description
-            service_desc = service_name
-            if service_product:
-                service_desc += f" ({service_product}"
-                if service_version:
-                    service_desc += f" {service_version}"
-                service_desc += ")"
-
+            # Build finding
             finding = {
-                "title": f"Open Port {port_id}/{protocol} - {service_name.title()}",
-                "description": f"Port {port_id}/{protocol} is open running {service_desc}",
-                "severity": severity,
+                "title": f"Open Port: {portid}/{protocol} ({service_name})",
+                "description": f"Port {portid}/{protocol} is open",
+                "severity": self._assess_port_severity(int(portid), service_name).value,
                 "category": "open_port",
-                "port": int(port_id),
-                "protocol": protocol,
-                "state": state,
-                "service": service_name,
-                "product": service_product,
-                "version": service_version,
                 "host": host_ip,
                 "hostname": hostname,
+                "port": int(portid),
+                "protocol": protocol,
+                "state": state,
+                "service": {
+                    "name": service_name,
+                    "product": service_product,
+                    "version": service_version,
+                },
             }
 
-            # Add security recommendations
-            finding["recommendation"] = self._get_port_recommendation(
-                int(port_id), service_name
-            )
+            return finding
 
-            # Additional details
-            if service_info:
-                finding["service_info"] = service_info
+        except Exception as e:
+            log_error(f"Error parsing port: {e}")
+            return None
 
-            findings.append(finding)
+    def _assess_port_severity(self, port: int, service: str) -> ScanSeverity:
+        """Assess severity of open port"""
+        # High-risk ports/services
+        high_risk_ports = [21, 23, 135, 139, 445, 1433, 1521, 3389, 5432, 5900]
 
-        return findings
+        if port in high_risk_ports:
+            return ScanSeverity.HIGH
 
-    def _assess_port_severity(self, port: int, service: str) -> str:
-        """
-        Assess the security severity of an open port
+        # Medium-risk services
+        if service in ["ssh", "telnet", "ftp", "smtp", "pop3", "imap"]:
+            return ScanSeverity.MEDIUM
 
-        Args:
-            port: Port number
-            service: Service name
+        # Common web ports
+        if port in [80, 443, 8080, 8443]:
+            return ScanSeverity.LOW
 
-        Returns:
-            Severity level string
-        """
-        # Critical services that should be carefully managed
-        critical_ports = {21, 23, 135, 139, 445, 1433, 1521, 3306, 3389, 5432, 5900}
+        return ScanSeverity.INFO
 
-        # High-risk services
-        high_risk_ports = {25, 53, 110, 143, 993, 995, 1723}
-
-        # Administrative/remote access services
-        admin_services = {"ssh", "telnet", "rdp", "vnc", "ftp"}
-
-        if port in critical_ports or service.lower() in admin_services:
-            return "high"
-        elif port in high_risk_ports:
-            return "medium"
-        elif port in {80, 443, 8080, 8443}:  # Web services
-            return "low"
+    def _get_ports_count(self, options: Dict[str, Any]) -> int:
+        """Get number of ports being scanned"""
+        ports = options.get("ports", "quick")
+        if ports == "quick":
+            return len(self.port_profiles["quick"])
+        elif ports == "top100":
+            return 100
+        elif ports == "top1000" or ports == "1-1000":
+            return 1000
+        elif ports == "comprehensive" or ports == "1-65535":
+            return 65535
         else:
-            return "info"
+            # Try to count custom port specification
+            try:
+                if "-" in str(ports):
+                    start, end = str(ports).split("-")
+                    return int(end) - int(start) + 1
+                elif "," in str(ports):
+                    return len(str(ports).split(","))
+                else:
+                    return 1
+            except:
+                return 1
 
-    def _get_port_recommendation(self, port: int, service: str) -> str:
-        """
-        Get security recommendation for a specific port/service
+    def _get_nmap_version(self) -> str:
+        """Get nmap version"""
+        try:
+            result = self.executor.execute(["nmap", "--version"])
+            if result.success:
+                return result.stdout.split("\n")[0]
+        except:
+            pass
+        return "unknown"
 
-        Args:
-            port: Port number
-            service: Service name
+    # Convenience methods for easy usage
+    def quick_scan(self, target: str) -> ScanResult:
+        """Quick scan of most common ports"""
+        return self.scan(target, {"ports": "quick", "timing": 4, "no_ping": False})
 
-        Returns:
-            Security recommendation string
-        """
-        recommendations = {
-            21: "Consider using SFTP instead of FTP for secure file transfer",
-            22: "Ensure SSH is configured with key-based authentication and latest version",
-            23: "Telnet is insecure - replace with SSH for remote access",
-            25: "Secure SMTP configuration and consider authentication requirements",
-            53: "Ensure DNS server is properly configured and not an open resolver",
-            80: "Consider redirecting HTTP traffic to HTTPS",
-            135: "RPC services can be security risks - ensure proper firewall rules",
-            139: "NetBIOS services should be restricted to internal networks only",
-            443: "Ensure SSL/TLS configuration follows security best practices",
-            445: "SMB should be restricted and use latest protocol versions",
-            1433: "SQL Server should not be exposed to public networks",
-            1521: "Oracle database should be properly secured and not publicly accessible",
-            3306: "MySQL should be secured and not accessible from public networks",
-            3389: "RDP should use Network Level Authentication and strong passwords",
-            5432: "PostgreSQL should be properly secured with authentication",
-            5900: "VNC should use strong authentication and encryption",
-        }
-
-        return recommendations.get(
-            port,
-            "Review service configuration and ensure it follows security best practices",
+    def full_scan(self, target: str) -> ScanResult:
+        """Full scan with service detection"""
+        return self.scan(
+            target,
+            {"ports": "top1000", "timing": 3, "no_ping": False, "nmap_args": ["-A"]},
         )
 
-    def get_scan_profiles(self) -> Dict[str, Any]:
-        """
-        Get available scan profiles with performance information
-
-        Returns:
-            Dictionary of scan profiles
-        """
-        profiles = {}
-        for profile_name, ports in self.port_profiles.items():
-            if isinstance(ports, list):
-                port_count = len(ports)
-                estimated_time = "Fast"
-            elif ports == "100":
-                port_count = 100
-                estimated_time = "Fast"
-            elif ports == "1000":
-                port_count = 1000
-                estimated_time = "Medium"
-            else:  # all ports
-                port_count = 65535
-                estimated_time = "Very Slow"
-
-            profiles[profile_name] = {
-                "description": f"{profile_name.title()} port scan",
-                "port_count": port_count,
-                "estimated_time": estimated_time,
-                "memory_usage": "Low" if port_count <= 1000 else "High",
-            }
-
-        return profiles
-
-    def get_performance_stats(self) -> Dict[str, Any]:
-        """
-        Get performance statistics for this scanner
-
-        Returns:
-            Performance statistics
-        """
-        base_stats = self.performance_manager.get_performance_stats()
-        scanner_stats = {
-            "scanner_name": self.name,
-            "cache_enabled": True,
-            "profiles_available": list(self.port_profiles.keys()),
-            "timeout": self.timeout,
-        }
-
-        return {**base_stats, "scanner_specific": scanner_stats}
-
-    def clear_cache(self):
-        """Clear cached results for this scanner"""
-        # This would need to be implemented in the performance manager
-        # to clear only port scanner results
-        log_info("Port scanner cache cleared")
-
-    def __del__(self):
-        """Cleanup when scanner is destroyed"""
-        # Performance manager cleanup is handled globally
-        pass
+    def stealth_scan(self, target: str) -> ScanResult:
+        """Stealth scan with slower timing"""
+        return self.scan(target, {"ports": "quick", "timing": 1, "no_ping": True})

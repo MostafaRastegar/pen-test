@@ -29,6 +29,7 @@ from src.orchestrator import (
     ScanWorkflow,
 )
 from src.orchestrator.workflow import WorkflowStatus
+from src.utils.reporter import ReportGenerator, generate_comprehensive_report
 from src.utils.logger import (
     LoggerSetup,
     log_banner,
@@ -306,6 +307,7 @@ def cli(debug, quiet):
 @click.option("--include-ssl", is_flag=True, help="Include SSL/TLS analysis")
 @click.option("--ports", help="Port range for port scanner")
 @click.option("--json-report", is_flag=True, help="Generate JSON report")
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
 @click.option("--pdf-report", is_flag=True, help="Generate PDF report")
 @click.option("--all-reports", is_flag=True, help="Generate all report formats")
 @common_options
@@ -322,6 +324,7 @@ def scan(
     include_ssl,
     ports,
     json_report,
+    html_report,
     pdf_report,
     all_reports,
     **kwargs,
@@ -704,7 +707,7 @@ def scan(
 
         # Generate reports
         report_generated = False
-        if json_report or pdf_report or all_reports:
+        if json_report or html_report or pdf_report or all_reports:
             try:
                 log_info("📊 Starting report generation...")
 
@@ -727,7 +730,16 @@ def scan(
 
                 log_debug(f"Report name: {report_name}")
 
-                # Generate JSON report
+                # Initialize ReportGenerator
+                reporter = ReportGenerator()
+
+                # Convert results to ScanResult format for ReportGenerator
+                scan_results = []
+                for scanner_name, result in all_results.items():
+                    if result:
+                        scan_results.append(result)
+
+                # Generate JSON report (keep the manual way since it works)
                 if json_report or all_reports:
                     try:
                         log_info("🔄 Generating JSON report...")
@@ -821,12 +833,64 @@ def scan(
                     except Exception as e:
                         log_error(f"❌ JSON report generation failed: {e}")
                         log_debug(f"JSON error details: {str(e)}")
-                        import traceback
 
-                        log_debug(f"JSON traceback: {traceback.format_exc()}")
+                # Generate HTML report using ReportGenerator
+                if html_report or all_reports:
+                    try:
+                        log_info("🔄 Generating HTML report...")
+                        html_file = REPORT_DIR / f"{report_name}.html"
 
-                # Generate TXT report (instead of PDF for simplicity)
+                        success = reporter.generate_html_report(
+                            scan_results,
+                            html_file,
+                            f"Security Assessment Report - {target}",
+                        )
+
+                        if success:
+                            file_size = html_file.stat().st_size
+                            log_success(
+                                f"✅ HTML report generated: {html_file} ({file_size} bytes)"
+                            )
+                            report_generated = True
+                        else:
+                            log_warning("⚠️ HTML report generation had issues")
+
+                    except Exception as e:
+                        log_error(f"❌ HTML report generation failed: {e}")
+                        log_debug(f"HTML error details: {str(e)}")
+
+                # Generate PDF report using ReportGenerator
                 if pdf_report or all_reports:
+                    try:
+                        log_info("🔄 Generating PDF report...")
+                        pdf_file = REPORT_DIR / f"{report_name}.pdf"
+
+                        success = reporter.generate_pdf_report(
+                            scan_results,
+                            pdf_file,
+                            f"Security Assessment Report - {target}",
+                        )
+
+                        if success:
+                            file_size = pdf_file.stat().st_size
+                            log_success(
+                                f"✅ PDF report generated: {pdf_file} ({file_size} bytes)"
+                            )
+                            report_generated = True
+                        else:
+                            log_warning("⚠️ PDF report generation had issues")
+                            log_info("💡 Try installing: pip install weasyprint")
+
+                    except Exception as e:
+                        log_error(f"❌ PDF report generation failed: {e}")
+                        log_debug(f"PDF error details: {str(e)}")
+                        if "weasyprint" in str(e).lower() or "pdfkit" in str(e).lower():
+                            log_info("💡 Install PDF libraries:")
+                            log_info("   pip install weasyprint")
+                            log_info("   OR pip install pdfkit")
+
+                # Generate TXT report (fallback/additional)
+                if all_reports:
                     try:
                         log_info("🔄 Generating TXT report...")
                         txt_file = REPORT_DIR / f"{report_name}.txt"
@@ -911,9 +975,6 @@ def scan(
                     except Exception as e:
                         log_error(f"❌ TXT report generation failed: {e}")
                         log_debug(f"TXT error details: {str(e)}")
-                        import traceback
-
-                        log_debug(f"TXT traceback: {traceback.format_exc()}")
 
             except Exception as e:
                 log_error(f"❌ Report generation failed: {e}")
@@ -1020,6 +1081,74 @@ def info():
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
+
+@click.command()
+def check_deps():
+    """Check report generation dependencies"""
+    try:
+        log_info("Checking Report Generation Dependencies")
+        log_info("=" * 45)
+
+        # Check Jinja2 for HTML templates
+        try:
+            import jinja2
+
+            log_success(
+                f"✓ Jinja2 available (v{jinja2.__version__}) - HTML reports supported"
+            )
+        except ImportError:
+            log_error("✗ Jinja2 not available - HTML reports will use basic templates")
+            log_info("  Install with: pip install jinja2")
+
+        # Check PDF libraries
+        pdf_available = False
+
+        try:
+            import weasyprint
+
+            log_success(f"✓ WeasyPrint available - PDF reports supported")
+            pdf_available = True
+        except ImportError:
+            try:
+                import pdfkit
+
+                log_success(f"✓ PDFKit available - PDF reports supported")
+                pdf_available = True
+            except ImportError:
+                log_error("✗ No PDF libraries available")
+                log_info("  Install with: pip install weasyprint")
+                log_info("  OR: pip install pdfkit")
+
+        # Check system dependencies for WeasyPrint
+        if pdf_available:
+            try:
+                import weasyprint
+
+                # Try to create a simple PDF to test system deps
+                weasyprint.HTML(string="<h1>Test</h1>").write_pdf(None)
+                log_success("✓ PDF system dependencies OK")
+            except Exception as e:
+                if "weasyprint" in str(e).lower():
+                    log_warning("⚠️ WeasyPrint system dependencies missing")
+                    log_info(
+                        "  Install with: sudo apt install libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0"
+                    )
+
+        log_info("")
+        log_info("Available Report Formats:")
+        log_info("  • JSON - Always available")
+        log_info("  • TXT  - Always available")
+        log_info(
+            f"  • HTML - {'Available' if 'jinja2' in sys.modules else 'Limited (basic only)'}"
+        )
+        log_info(f"  • PDF  - {'Available' if pdf_available else 'Not available'}")
+
+    except Exception as e:
+        log_error(f"Dependency check failed: {e}")
+
+
+# Add check-deps command
+cli.add_command(check_deps)
 
 # Add all commands to the CLI group
 cli.add_command(scan)

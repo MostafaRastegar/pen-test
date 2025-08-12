@@ -1,0 +1,17 @@
+{
+  "scan_info": {
+    "target": "test",
+    "timestamp": "20250812_165043"
+  },
+  "results": {
+    "test_scanner": {
+      "success": true,
+      "findings": [
+        {
+          "title": "Test Finding",
+          "severity": "info"
+        }
+      ]
+    }
+  }
+}

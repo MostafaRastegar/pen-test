@@ -17,6 +17,14 @@ from src.scanners.recon.port_scanner import PortScanner
 from src.scanners.recon.dns_scanner import DNSScanner
 from src.scanners.vulnerability.web_scanner import WebScanner
 from src.scanners.vulnerability.directory_scanner import DirectoryScanner
+from src.scanners.vulnerability.ssl_scanner import SSLScanner
+from src.orchestrator import (
+    create_quick_workflow,
+    create_full_workflow,
+    create_web_workflow,
+    ScanWorkflow,
+)
+from src.utils.reporter import ReportGenerator, generate_comprehensive_report
 from src.utils.logger import (
     LoggerSetup,
     log_banner,
@@ -60,6 +68,133 @@ def cli(debug, quiet):
             log_dir=OUTPUT_DIR / "logs",
             use_rich=True,
         )
+
+
+@cli.command()
+@click.argument("target")
+@click.option("--port", type=int, default=443, help="SSL port to scan (default: 443)")
+@click.option(
+    "--use-sslscan/--no-sslscan", default=True, help="Enable/disable sslscan tool"
+)
+@click.option("--timeout", type=int, default=120, help="SSL scan timeout in seconds")
+@click.option(
+    "--output", type=click.Path(), help="Output file for results (JSON format)"
+)
+@click.option(
+    "--protocol-tests/--no-protocol-tests",
+    default=True,
+    help="Test SSL/TLS protocol support",
+)
+@click.option(
+    "--vulnerability-tests/--no-vulnerability-tests",
+    default=True,
+    help="Test for SSL vulnerabilities",
+)
+def ssl(
+    target, port, use_sslscan, timeout, output, protocol_tests, vulnerability_tests
+):
+    """
+    Perform SSL/TLS certificate and configuration analysis.
+
+    TARGET can be a URL, domain name, or IP address.
+
+    Examples:
+    \b
+        auto-pentest ssl https://example.com
+        auto-pentest ssl example.com --port 443
+        auto-pentest ssl 192.168.1.1 --no-sslscan
+        auto-pentest ssl target.com --output ssl_results.json
+    """
+    log_banner(f"SSL/TLS Analysis - {target}", "bold cyan")
+
+    try:
+        # Create SSL scanner
+        ssl_scanner = SSLScanner(timeout=timeout)
+
+        log_info(f"Target: {target}")
+        log_info(f"Port: {port}")
+
+        # Prepare scan options
+        scan_options = {
+            "port": port,
+            "use_sslscan": use_sslscan,
+            "protocol_tests": protocol_tests,
+            "vulnerability_tests": vulnerability_tests,
+        }
+
+        log_info(f"SSL scan options: {scan_options}")
+
+        # Check dependencies
+        capabilities = ssl_scanner.get_capabilities()
+        sslscan_available = capabilities["dependencies"]["sslscan"]["available"]
+
+        if use_sslscan and not sslscan_available:
+            log_warning("sslscan not found! Continuing with built-in SSL tests...")
+            scan_options["use_sslscan"] = False
+        elif use_sslscan and sslscan_available:
+            log_info("✓ sslscan available - will perform detailed analysis")
+
+        log_info("Starting SSL/TLS analysis...")
+
+        # Execute SSL scan
+        result = ssl_scanner.scan(target, scan_options)
+
+        # Display results
+        display_scan_results(result)
+
+        # Save results
+        if output:
+            output_path = Path(output)
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # Clean target for filename
+            clean_target = (
+                target.replace("://", "_").replace("/", "_").replace(":", "_")
+            )
+            filename = f"ssl_{clean_target}_{timestamp}.json"
+            output_path = REPORT_DIR / filename
+
+        result.save_to_file(output_path)
+        log_success(f"Results saved to: {output_path}")
+
+        # Summary
+        log_banner("SSL/TLS Scan Summary", "bold green")
+        log_info(f"Target: {result.target}")
+        log_info(f"Status: {result.status.value}")
+        log_info(f"Total findings: {len(result.findings)}")
+
+        # Count findings by category
+        categories = {}
+        for finding in result.findings:
+            category = finding.get("category", "unknown")
+            categories[category] = categories.get(category, 0) + 1
+
+        for category, count in categories.items():
+            if count > 0:
+                log_info(f"{category.replace('_', ' ').title()}: {count}")
+
+        # Count by severity
+        critical = len([f for f in result.findings if f.get("severity") == "critical"])
+        high = len([f for f in result.findings if f.get("severity") == "high"])
+
+        if critical > 0:
+            log_error(f"Critical issues: {critical}")
+        if high > 0:
+            log_warning(f"High severity issues: {high}")
+
+        if result.errors:
+            log_warning(f"Errors encountered: {len(result.errors)}")
+
+    except KeyboardInterrupt:
+        log_warning("SSL scan interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        log_error(f"SSL scan failed: {e}")
+        if logger.level <= 10:  # DEBUG level
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
 
 
 @cli.command()
@@ -374,6 +509,14 @@ def web(target, scheme, port, use_nikto, timeout, output, user_agent, follow_red
 @click.option("--include-dns", is_flag=True, help="Include DNS enumeration in scan")
 @click.option("--include-web", is_flag=True, help="Include web vulnerability scanning")
 @click.option("--include-directory", is_flag=True, help="Include directory enumeration")
+@click.option("--include-ssl", is_flag=True, help="Include SSL/TLS analysis")
+@click.option(
+    "--parallel/--sequential",
+    default=True,
+    help="Execute scans in parallel or sequential",
+)
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
+@click.option("--exec-summary", is_flag=True, help="Generate executive summary")
 def scan(
     target,
     profile,
@@ -385,6 +528,10 @@ def scan(
     include_dns,
     include_web,
     include_directory,
+    include_ssl,
+    parallel,
+    html_report,
+    exec_summary,
 ):
     """
     Perform a security scan on the specified target.
@@ -434,11 +581,16 @@ def scan(
 
         # Determine what to scan based on profile and options
         scan_ports = profile != "web" and not (
-            include_web and not include_dns and not ports and not include_directory
+            include_web
+            and not include_dns
+            and not ports
+            and not include_directory
+            and not include_ssl
         )
         scan_dns = (target_type == "domain" and include_dns) or profile == "full"
         scan_web = include_web or profile in ["web", "full"]
         scan_directory = include_directory or profile == "full"
+        scan_ssl = include_ssl or profile == "full"
 
         # Port scanning (unless web-only profile)
         if scan_ports:
@@ -520,6 +672,26 @@ def scan(
 
             dir_result = dir_scanner.scan(sanitized_target, dir_options)
             all_results.append(dir_result)
+
+        # SSL scanning (if requested or full profile)
+        if scan_ssl:
+            log_info("Starting SSL/TLS analysis...")
+
+            ssl_scanner = SSLScanner(timeout=timeout)
+
+            # SSL scan options
+            ssl_options = {"port": 443}
+            if profile == "full":
+                ssl_options["use_sslscan"] = True
+                ssl_options["protocol_tests"] = True
+                ssl_options["vulnerability_tests"] = True
+            else:
+                ssl_options["use_sslscan"] = False
+                ssl_options["protocol_tests"] = True
+                ssl_options["vulnerability_tests"] = False
+
+            ssl_result = ssl_scanner.scan(sanitized_target, ssl_options)
+            all_results.append(ssl_result)
 
         # Handle case where no scans were performed
         if not all_results:
@@ -634,9 +806,9 @@ def list_tools():
         "nikto": "Web vulnerability scanner",
         "dirb": "Directory/file brute forcer",
         "gobuster": "Fast directory/DNS/vhost fuzzer",
+        "sslscan": "SSL/TLS configuration scanner",
         "sqlmap": "SQL injection tester",
         "subfinder": "Subdomain discovery tool",
-        "sslscan": "SSL/TLS configuration scanner",
     }
 
     # Check Python DNS library
@@ -669,7 +841,7 @@ def list_tools():
 
     log_info("\nTo install missing tools on Ubuntu/Debian:")
     log_info(
-        "sudo apt update && sudo apt install -y nmap nikto sqlmap dirb gobuster dnsutils"
+        "sudo apt update && sudo apt install -y nmap nikto sqlmap dirb gobuster sslscan dnsutils"
     )
     log_info("pip install dnspython requests  # For DNS and web scanning")
 
@@ -690,13 +862,14 @@ def info():
     log_info("  • DNS Enumeration (dnspython)")
     log_info("  • Web Vulnerability Scanning (nikto + custom)")
     log_info("  • Directory Enumeration (dirb/gobuster)")
+    log_info("  • SSL/TLS Analysis (sslscan + built-in)")
     log_info("  • [Coming Soon] Subdomain Discovery")
-    log_info("  • [Coming Soon] SSL/TLS Analysis")
 
     log_info("\nAvailable Commands:")
     log_info("  • scan - Comprehensive security scan")
     log_info("  • web - Web vulnerability scanning")
     log_info("  • directory - Directory and file enumeration")
+    log_info("  • ssl - SSL/TLS certificate and configuration analysis")
     log_info("  • dns - DNS enumeration and analysis")
     log_info("  • quick - Quick port scan")
     log_info("  • full - Full comprehensive scan")

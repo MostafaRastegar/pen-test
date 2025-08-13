@@ -181,74 +181,8 @@ sudo yum install -y wkhtmltopdf
 brew install --cask wkhtmltopdf
 ```
 
-### Step 4: Project Structure Setup
 
-**Create Directory Structure:**
-```bash
-mkdir -p {src/{core,scanners/{recon,vulnerability},utils,orchestrator},config,templates,output/{logs,reports,raw},tests/{unit,integration,fixtures}}
-```
-
-**Create Configuration Files:**
-```bash
-# Create .env file
-cat > .env << 'EOF'
-# General Settings
-DEBUG=False
-LOG_LEVEL=INFO
-OUTPUT_DIR=./output
-
-# Scan Settings
-MAX_THREADS=10
-TIMEOUT=30
-RATE_LIMIT=100
-
-# Tool Paths (auto-detected)
-NMAP_PATH=nmap
-NIKTO_PATH=nikto
-DIRB_PATH=dirb
-GOBUSTER_PATH=gobuster
-SSLSCAN_PATH=sslscan
-EOF
-
-# Create .gitignore
-cat > .gitignore << 'EOF'
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-dist/
-*.egg-info/
-.pytest_cache/
-
-# Project specific
-output/
-*.log
-.env
-*.db
-*.sqlite
-custom_branding.json
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-
-# Reports
-reports/
-*.pdf
-*.html
-EOF
-```
-
-### Step 5: Test Installation
+### Step 4: Test Installation
 
 **Basic Tests:**
 ```bash

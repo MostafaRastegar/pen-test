@@ -484,7 +484,7 @@ class ScanWorkflow:
                 break
 
     def _execute_parallel(self, fail_fast: bool) -> None:
-        """Execute tasks in parallel respecting dependencies"""
+        """Execute tasks in parallel respecting dependencies - FIXED"""
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             remaining_tasks = self.tasks.copy()
             running_futures = {}
@@ -501,38 +501,53 @@ class ScanWorkflow:
                         running_futures[future] = task
                         remaining_tasks.remove(task)
 
-                # Wait for at least one task to complete
+                # Wait for at least one task to complete - FIXED TIMEOUT
                 if running_futures:
-                    completed_futures = as_completed(
-                        running_futures.keys(), timeout=1.0
-                    )
+                    # Use longer timeout - 5 minutes per task or minimum 300 seconds
+                    timeout_per_iteration = max(300, len(running_futures) * 60)
 
-                    for future in completed_futures:
-                        task = running_futures.pop(future)
+                    try:
+                        completed_futures = as_completed(
+                            running_futures.keys(), timeout=timeout_per_iteration
+                        )
 
-                        try:
-                            # Task is already updated by _execute_task
-                            result_task = future.result()
-                        except Exception as e:
-                            task.status = ScanStatus.FAILED
-                            task.error = str(e)
-                            log_error(f"Task execution error: {e}")
+                        for future in completed_futures:
+                            task = running_futures.pop(future)
 
-                        # Check fail_fast condition
-                        if (
-                            fail_fast
-                            and task.required
-                            and task.status == ScanStatus.FAILED
-                        ):
-                            log_error(
-                                f"Required task {task.scanner_name} failed, cancelling workflow"
-                            )
-                            # Cancel remaining futures
-                            for f in running_futures.keys():
-                                f.cancel()
-                            return
+                            try:
+                                # Task is already updated by _execute_task
+                                result_task = future.result(timeout=10)
+                            except Exception as e:
+                                task.status = ScanStatus.FAILED
+                                task.error = str(e)
+                                log_error(f"Task execution error: {e}")
 
-                        break  # Process one completion at a time
+                            # Check fail_fast condition
+                            if (
+                                fail_fast
+                                and task.required
+                                and task.status == ScanStatus.FAILED
+                            ):
+                                log_error(
+                                    f"Required task {task.scanner_name} failed, cancelling workflow"
+                                )
+                                # Cancel remaining futures
+                                for f in running_futures.keys():
+                                    f.cancel()
+                                return
+
+                            break  # Process one completion at a time
+
+                    except Exception as e:
+                        log_error(f"Parallel execution timeout or error: {e}")
+                        # Mark all running tasks as failed
+                        for future, task in running_futures.items():
+                            future.cancel()
+                            if task.status == ScanStatus.RUNNING:
+                                task.status = ScanStatus.FAILED
+                                task.error = f"Execution timeout: {str(e)}"
+                                task.end_time = datetime.now()
+                        break
 
     def _aggregate_results(self) -> Optional[ScanResult]:
         """Aggregate all scan results into a single result"""

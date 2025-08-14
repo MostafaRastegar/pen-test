@@ -524,9 +524,9 @@ class InstallationVerifier:
         total += 1
         try:
             sys.path.insert(0, str(Path("src").resolve()))
-            from core.scanner_base import ScannerBase
-            from core.executor import CommandExecutor
-            from core.validator import InputValidator
+            from src.core.scanner_base import ScannerBase
+            from src.core.executor import CommandExecutor
+            from src.core.validator import InputValidator
 
             print_success("Core modules: Import successful")
             passed += 1
@@ -539,9 +539,9 @@ class InstallationVerifier:
         # Test scanner imports
         total += 1
         try:
-            from scanners.recon.port_scanner import PortScanner
-            from scanners.recon.dns_scanner import DNSScanner
-            from scanners.vulnerability.web_scanner import WebScanner
+            from src.scanners.recon.port_scanner import PortScanner
+            from src.scanners.recon.dns_scanner import DNSScanner
+            from src.scanners.vulnerability.web_scanner import WebScanner
 
             print_success("Scanner modules: Import successful")
             passed += 1
@@ -554,7 +554,7 @@ class InstallationVerifier:
         # Test report generation
         total += 1
         try:
-            from utils.reporter import Reporter
+            from src.utils.reporter import Reporter
 
             print_success("Reporter module: Import successful")
             passed += 1

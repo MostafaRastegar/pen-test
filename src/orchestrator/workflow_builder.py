@@ -224,27 +224,36 @@ class WorkflowBuilder:
         return self
 
     def build(self, target: Dict[str, str]) -> ScanWorkflow:
-        """Build the workflow"""
-        workflow = ScanWorkflow(target=target["original"])
 
-        # Add configured scanners
+        from datetime import datetime
+
+        # Create workflow
+        workflow_id = f"custom_{int(datetime.now().timestamp())}"
+        workflow = ScanWorkflow(workflow_id)
+
+        # Add configured scanners as tasks
         for scanner_config in self.scanners:
-            scanner_class = scanner_config["scanner"]
+            scanner_name = scanner_config["type"] + "_scanner"
             scanner_options = scanner_config["options"]
 
-            # Create scanner instance
-            scanner = scanner_class()
+            # Determine appropriate target format for this scanner
+            if scanner_config["type"] == "port":
+                scan_target = target["host"]
+            elif scanner_config["type"] == "dns":
+                scan_target = target["domain"]
+            elif scanner_config["type"] in ["web", "directory"]:
+                scan_target = target["url"]
+            elif scanner_config["type"] == "ssl":
+                scan_target = target["host"]
+            else:
+                scan_target = target["original"]
 
-            # Add to workflow
-            workflow.add_scanner(scanner, scanner_options)
-
-        # Apply workflow options
-        if self.options.get("parallel", True):
-            workflow.set_execution_mode("parallel")
-        else:
-            workflow.set_execution_mode("sequential")
-
-        if "timeout" in self.options:
-            workflow.set_timeout(self.options["timeout"])
+            # Add task to workflow
+            workflow.add_scan_task(
+                scanner_name=scanner_name,
+                target=scan_target,
+                options=scanner_options,
+                timeout=self.options.get("timeout", 300),
+            )
 
         return workflow

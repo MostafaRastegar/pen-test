@@ -1,4 +1,5 @@
 # Auto-Pentest Framework v0.9.1 - Development Guide
+python -m pytest tests/test_web_scanner.py -v -n auto
 
 ## 🎯 **Welcome to Development**
 

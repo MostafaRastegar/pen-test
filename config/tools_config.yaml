@@ -37,3 +37,76 @@ tools:
     name: "Directory Scanner"
     binary: "dirb"
     wordlist: "/usr/share/wordlists/dirb/common.txt"
+    
+  # Phase 1.1: CMS-Specific Vulnerability Scanners
+  wpscan:
+    name: "WordPress Security Scanner"
+    binary: "wpscan"
+    description: "WordPress vulnerability scanner"
+    category: "cms"
+    default_args:
+      - "--no-banner"
+      - "--random-user-agent"
+      - "--format"
+      - "json"
+    profiles:
+      quick:
+        description: "Quick WordPress scan"
+        args:
+          - "--enumerate"
+          - "vp"  # Vulnerable plugins only
+      standard:
+        description: "Standard WordPress security scan"
+        args:
+          - "--enumerate"
+          - "p,t,u"  # Plugins, themes, users
+      comprehensive:
+        description: "Comprehensive WordPress assessment"
+        args:
+          - "--enumerate"
+          - "ap,at,u,dbe"  # All plugins, all themes, users, db exports
+          - "--plugins-detection"
+          - "aggressive"
+          - "--plugins-version-detection"
+          - "aggressive"
+    options:
+      api_token:
+        description: "WPScan API token for vulnerability data"
+        required: false
+        env_var: "WPSCAN_API_TOKEN"
+      max_threads:
+        description: "Maximum threads for enumeration"
+        default: 5
+        type: "integer"
+      request_timeout:
+        description: "Request timeout in seconds"
+        default: 60
+        type: "integer"
+      connect_timeout:
+        description: "Connection timeout in seconds" 
+        default: 30
+        type: "integer"
+      max_scan_duration:
+        description: "Maximum scan duration in seconds"
+        default: 300
+        type: "integer"
+    wordlists:
+      users: "/usr/share/wordlists/wpscan/usernames.txt"
+      passwords: "/usr/share/wordlists/rockyou.txt"
+    features:
+      - "WordPress version detection"
+      - "Plugin enumeration and vulnerability detection"
+      - "Theme enumeration and vulnerability detection"
+      - "User enumeration"
+      - "Brute force protection testing"
+      - "WordPress-specific CVE database integration"
+      - "Security configuration analysis"
+      - "XML-RPC testing"
+    requirements:
+      - "wpscan gem installed"
+      - "Ruby >= 2.5"
+      - "Internet connection for vulnerability data"
+    installation:
+      ubuntu: "gem install wpscan"
+      gem: "gem install wpscan"
+      docker: "docker pull wpscanteam/wpscan"

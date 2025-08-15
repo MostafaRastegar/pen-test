@@ -613,3 +613,166 @@ def create_web_workflow(target: str, workflow_id: Optional[str] = None) -> ScanW
     workflow = ScanWorkflow(workflow_id)
     workflow.create_standard_workflow(target, "web")
     return workflow
+
+
+def create_cms_workflow(target: str, workflow_id: Optional[str] = None) -> ScanWorkflow:
+    """Create a CMS-focused scan workflow"""
+    workflow_id = workflow_id or f"cms_{int(datetime.now().timestamp())}"
+    workflow = ScanWorkflow(workflow_id)
+
+    # Add WordPress scanner as primary CMS scanner
+    wordpress_options = {
+        "enumerate_plugins": True,
+        "enumerate_themes": True,
+        "enumerate_users": True,
+        "use_wpscan": True,
+        "check_xmlrpc": True,
+        "check_config": True,
+    }
+
+    workflow.add_scan_task(
+        scanner_name="wordpress_scanner",
+        target=target,
+        options=wordpress_options,
+        timeout=300,
+        priority=10,
+    )
+
+    # Add supporting web analysis
+    web_options = {
+        "use_nikto": True,
+        "include_headers": True,
+        "technology_detection": True,
+    }
+
+    workflow.add_scan_task(
+        scanner_name="web_scanner",
+        target=target,
+        options=web_options,
+        timeout=180,
+        priority=5,
+    )
+
+    # Add directory enumeration for CMS-specific paths
+    directory_options = {
+        "tool": "dirb",
+        "wordlist": "cms_combined",  # CMS-specific wordlist
+        "extensions": "php,asp,jsp,html",
+    }
+
+    workflow.add_scan_task(
+        scanner_name="directory_scanner",
+        target=target,
+        options=directory_options,
+        timeout=300,
+        priority=3,
+    )
+
+    return workflow
+
+
+def create_wordpress_workflow(
+    target: str, workflow_id: Optional[str] = None
+) -> ScanWorkflow:
+    """Create a WordPress-specific workflow"""
+    workflow_id = workflow_id or f"wordpress_{int(datetime.now().timestamp())}"
+    workflow = ScanWorkflow(workflow_id)
+
+    # Comprehensive WordPress analysis
+    wordpress_options = {
+        "enumerate_plugins": True,
+        "enumerate_themes": True,
+        "enumerate_users": True,
+        "use_wpscan": True,
+        "check_xmlrpc": True,
+        "check_config": True,
+        "plugins_detection": "aggressive",
+        "plugins_version_detection": "aggressive",
+    }
+
+    workflow.add_scan_task(
+        scanner_name="wordpress_scanner",
+        target=target,
+        options=wordpress_options,
+        timeout=600,  # Longer timeout for comprehensive scan
+        priority=10,
+    )
+
+    return workflow
+
+
+# Update existing create_web_workflow to include optional WordPress detection
+def create_enhanced_web_workflow(
+    target: str, include_cms: bool = True, workflow_id: Optional[str] = None
+) -> ScanWorkflow:
+    """Create an enhanced web workflow with optional CMS detection"""
+    workflow_id = workflow_id or f"enhanced_web_{int(datetime.now().timestamp())}"
+    workflow = ScanWorkflow(workflow_id)
+
+    # Basic web scanning
+    web_options = {
+        "use_nikto": True,
+        "include_headers": True,
+        "technology_detection": True,
+    }
+
+    workflow.add_scan_task(
+        scanner_name="web_scanner",
+        target=target,
+        options=web_options,
+        timeout=180,
+        priority=10,
+    )
+
+    # Add CMS detection if requested
+    if include_cms:
+        # WordPress detection (lightweight)
+        wordpress_options = {
+            "enumerate_plugins": False,
+            "enumerate_themes": False,
+            "enumerate_users": False,
+            "use_wpscan": False,  # Quick detection only
+            "check_xmlrpc": True,
+            "check_config": True,
+        }
+
+        workflow.add_scan_task(
+            scanner_name="wordpress_scanner",
+            target=target,
+            options=wordpress_options,
+            timeout=120,
+            priority=8,
+        )
+
+    # Directory enumeration
+    directory_options = {
+        "tool": "dirb",
+        "wordlist": "common",
+        "extensions": "php,html,asp,jsp",
+    }
+
+    workflow.add_scan_task(
+        scanner_name="directory_scanner",
+        target=target,
+        options=directory_options,
+        timeout=300,
+        priority=5,
+    )
+
+    # SSL analysis for HTTPS targets
+    if target.startswith("https://"):
+        ssl_options = {
+            "cipher_enum": True,
+            "cert_info": True,
+            "vulnerability_check": True,
+        }
+
+        workflow.add_scan_task(
+            scanner_name="ssl_scanner",
+            target=target,
+            options=ssl_options,
+            timeout=120,
+            priority=3,
+        )
+
+    return workflow

@@ -227,3 +227,215 @@ def clear_cache_command(all, scanner, force):
         cache_service.clear_cache(all, scanner, force)
     except Exception as e:
         log_error(f"Error clearing cache: {e}")
+
+
+@click.command()
+@click.argument("target")
+@click.option(
+    "--enumerate-plugins",
+    is_flag=True,
+    default=True,
+    help="Enumerate WordPress plugins",
+)
+@click.option(
+    "--enumerate-themes", is_flag=True, default=True, help="Enumerate WordPress themes"
+)
+@click.option(
+    "--enumerate-users", is_flag=True, default=True, help="Enumerate WordPress users"
+)
+@click.option(
+    "--use-wpscan",
+    is_flag=True,
+    default=True,
+    help="Use WPScan for comprehensive analysis",
+)
+@click.option("--wpscan-api-token", help="WPScan API token for vulnerability data")
+@click.option(
+    "--check-xmlrpc", is_flag=True, default=True, help="Test XML-RPC endpoint security"
+)
+@click.option(
+    "--check-config", is_flag=True, default=True, help="Analyze security configuration"
+)
+@click.option(
+    "--scheme",
+    type=click.Choice(["http", "https"]),
+    default="https",
+    help="URL scheme to use",
+)
+@click.option("--port", type=int, help="Target port (if not standard)")
+@common_options
+def wordpress_command(
+    target,
+    enumerate_plugins,
+    enumerate_themes,
+    enumerate_users,
+    use_wpscan,
+    wpscan_api_token,
+    check_xmlrpc,
+    check_config,
+    scheme,
+    port,
+    **kwargs,
+):
+    """
+    WordPress security scanning with WPScan integration
+
+    Performs comprehensive WordPress security assessment including:
+    - WordPress version detection and vulnerability analysis
+    - Plugin enumeration and vulnerability scanning
+    - Theme enumeration and security analysis
+    - User enumeration and brute force protection testing
+    - XML-RPC security testing
+    - Security configuration analysis
+
+    Examples:
+        \b
+        # Basic WordPress scan
+        python main.py wordpress example.com
+
+        # Comprehensive scan with WPScan API
+        python main.py wordpress https://blog.example.com --wpscan-api-token YOUR_TOKEN
+
+        # Quick enumeration without WPScan
+        python main.py wordpress example.com --no-use-wpscan
+
+        # Custom port and scheme
+        python main.py wordpress example.com --scheme http --port 8080
+    """
+    try:
+        from ..scanners.cms.wordpress_scanner import WordPressScanner
+        from ..utils.logger import log_info, log_success, log_error
+        from ..utils.reporter import ReportGenerator
+        from pathlib import Path
+        import json
+
+        log_info(f"🎯 Starting WordPress security scan for: {target}")
+
+        # Initialize WordPress scanner
+        scanner = WordPressScanner(timeout=kwargs.get("timeout", 300))
+
+        # Validate target
+        if not scanner.validate_target(target):
+            raise ValueError(f"Invalid WordPress target: {target}")
+
+        # Prepare scan options
+        scan_options = {
+            "enumerate_plugins": enumerate_plugins,
+            "enumerate_themes": enumerate_themes,
+            "enumerate_users": enumerate_users,
+            "use_wpscan": use_wpscan,
+            "wpscan_api_token": wpscan_api_token,
+            "check_xmlrpc": check_xmlrpc,
+            "check_config": check_config,
+            "scheme": scheme,
+            "port": port,
+        }
+
+        # Execute scan
+        result = scanner._execute_scan(target, scan_options)
+
+        # Display results summary
+        log_success(f"✅ WordPress scan completed")
+        log_info(f"📊 Total findings: {len(result.findings)}")
+
+        if result.findings:
+            severity_counts = {}
+            for finding in result.findings:
+                severity = finding.get("severity", "info")
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+            for severity, count in severity_counts.items():
+                log_info(f"   {severity.upper()}: {count}")
+
+        # Generate reports
+        output_dir = Path(kwargs.get("output_dir", "output/reports"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # JSON report (always generated)
+        json_file = (
+            output_dir
+            / f"wordpress_scan_{target.replace('://', '_').replace('/', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        result.save_to_file(json_file)
+        log_success(f"📄 JSON report saved: {json_file}")
+
+        # Generate additional reports if requested
+        if kwargs.get("html_report") or kwargs.get("all_reports"):
+            try:
+                reporter = ReportGenerator()
+                html_file = (
+                    output_dir
+                    / f"wordpress_scan_{target.replace('://', '_').replace('/', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.html"
+                )
+
+                # Convert result to format expected by reporter
+                report_data = {
+                    "target": target,
+                    "scan_type": "WordPress Security Scan",
+                    "timestamp": result.start_time.isoformat(),
+                    "duration": (
+                        str(result.end_time - result.start_time)
+                        if result.end_time
+                        else "Unknown"
+                    ),
+                    "findings": result.findings,
+                    "summary": {
+                        "total_findings": len(result.findings),
+                        "severity_counts": severity_counts,
+                        "scanner_used": result.scanner_name,
+                    },
+                }
+
+                reporter.generate_html_report(report_data, html_file)
+                log_success(f"📄 HTML report saved: {html_file}")
+
+            except Exception as e:
+                log_error(f"Failed to generate HTML report: {e}")
+
+        if kwargs.get("pdf_report") or kwargs.get("all_reports"):
+            try:
+                reporter = ReportGenerator()
+                pdf_file = (
+                    output_dir
+                    / f"wordpress_scan_{target.replace('://', '_').replace('/', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.pdf"
+                )
+                reporter.generate_pdf_report(report_data, pdf_file)
+                log_success(f"📄 PDF report saved: {pdf_file}")
+
+            except Exception as e:
+                log_error(f"Failed to generate PDF report: {e}")
+
+        # Display quick summary of critical findings
+        critical_findings = [
+            f for f in result.findings if f.get("severity") == "critical"
+        ]
+        high_findings = [f for f in result.findings if f.get("severity") == "high"]
+
+        if critical_findings:
+            log_error(f"🚨 {len(critical_findings)} CRITICAL vulnerabilities found!")
+            for finding in critical_findings[:3]:  # Show first 3
+                log_error(f"   • {finding.get('title', 'Unknown')}")
+
+        if high_findings:
+            log_error(f"⚠️  {len(high_findings)} HIGH severity issues found!")
+            for finding in high_findings[:3]:  # Show first 3
+                log_error(f"   • {finding.get('title', 'Unknown')}")
+
+        if not critical_findings and not high_findings:
+            log_success("✅ No critical or high severity vulnerabilities detected")
+
+        # Exit with appropriate code
+        if critical_findings:
+            sys.exit(2)  # Critical vulnerabilities found
+        elif high_findings:
+            sys.exit(1)  # High severity issues found
+        else:
+            sys.exit(0)  # Success
+
+    except Exception as e:
+        log_error(f"WordPress scan failed: {e}")
+        if kwargs.get("debug"):
+            import traceback
+
+            log_error(traceback.format_exc())
+        sys.exit(1)

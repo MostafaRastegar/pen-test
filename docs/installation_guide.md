@@ -1,513 +1,355 @@
-# Auto-Pentest Tool - Enhanced Installation Guide
+# Auto-Pentest Framework - Installation Guide
 
-## 📋 Prerequisites
 
-### System Requirements
-- **Python**: 3.8 or higher
-- **Operating System**: Linux (Ubuntu 18.04+, CentOS 7+, Debian 10+), macOS, Windows 10+
-- **RAM**: Minimum 4GB, Recommended 8GB+
-- **Disk Space**: 2GB for installation + space for reports
-- **Network**: Internet connection for initial setup and scanning
+### **📋 System Requirements**
 
-### Required System Tools
-
+#### **Core Dependencies**
 ```bash
-# Ubuntu/Debian
+# Network & Web Security Tools
+- nmap (Network scanning)
+- nikto (Web vulnerability scanning)  
+- dirb/gobuster (Directory enumeration)
+- sslscan (SSL/TLS analysis)
+
+# NEW Phase 1.1: CMS Security
+- wpscan (WordPress security scanner) ⭐
+```
+
+#### **Python Requirements**
+- Python 3.8+ (3.9+ recommended)
+- Virtual environment (recommended)
+- PDF generation libraries (optional but recommended)
+
+---
+
+## 🔧 **Quick Installation**
+
+### **Option 1: Automated Installation (Recommended)**
+```bash
+# Clone the repository
+git clone <repository-url>
+cd auto-pentest-framework
+
+# Run automated installer
+chmod +x install_dependencies.sh
+./install_dependencies.sh
+
+# Verify installation
+python3 verify_installation.py
+```
+
+### **Option 2: Manual Installation**
+
+#### **Ubuntu/Debian**
+```bash
+# Update packages
 sudo apt update
-sudo apt install -y nmap nikto dirb gobuster sslscan dnsutils openssl wget curl git
 
-# CentOS/RHEL/Fedora
-sudo yum install -y nmap nikto dirb gobuster sslscan bind-utils openssl wget curl git
-# OR for newer versions:
-sudo dnf install -y nmap nikto dirb gobuster sslscan bind-utils openssl wget curl git
+# Install core security tools
+sudo apt install -y nmap nikto dirb gobuster sslscan dnsutils
 
-# macOS (using Homebrew)
-brew install nmap nikto dirb gobuster sslscan dig openssl wget curl git
+# Install WPScan (NEW - Phase 1.1)
+sudo apt install -y wpscan
+# OR install via Ruby gem if apt version not available:
+# sudo apt install -y ruby ruby-dev && gem install wpscan
 
-# Arch Linux
-sudo pacman -S nmap nikto dirb gobuster sslscan bind-tools openssl wget curl git
-```
-
-## 🚀 Quick Installation (Recommended)
-
-### Step 1: Download and Setup
-```bash
-# Clone or download the project
-git clone <repository-url> auto-pentest-tool
-cd auto-pentest-tool
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### Step 2: PDF Support Setup
-
-**Option A: WeasyPrint (Recommended)**
-```bash
-# Ubuntu/Debian
-sudo apt install -y python3-dev python3-pip libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0
-pip install weasyprint
-
-# macOS
-brew install pango
-pip install weasyprint
-
-# Windows (may require additional setup)
-pip install weasyprint
-```
-
-**Option B: PDFKit (Alternative)**
-```bash
-# Install wkhtmltopdf first
-# Ubuntu/Debian
-sudo apt install -y wkhtmltopdf
-pip install pdfkit
-
-# macOS
-brew install --cask wkhtmltopdf
-pip install pdfkit
-
-# CentOS/RHEL
-sudo yum install -y wkhtmltopdf
-pip install pdfkit
-```
-
-### Step 3: Verify Installation
-```bash
-# Run verification script
-python verify_installation.py
-
-# Test basic functionality
-python main.py --help
-python main.py list-tools
-python main.py info
-```
-
-## 📦 Detailed Installation Steps
-
-### Step 1: Environment Setup
-
-**Create Project Directory:**
-```bash
-mkdir auto-pentest-tool
-cd auto-pentest-tool
-```
-
-**Setup Python Virtual Environment:**
-```bash
-# Using venv (recommended)
-python3 -m venv venv
-source venv/bin/activate
-
-# Or using virtualenv
-pip install virtualenv
-virtualenv venv
-source venv/bin/activate
-
-# Or using conda
-conda create -n auto-pentest python=3.9
-conda activate auto-pentest
-```
-
-### Step 2: Dependencies Installation
-
-**Core Python Dependencies:**
-```bash
-# Install from requirements.txt
-pip install -r requirements.txt
-
-# Or install manually
-pip install click>=8.0.0 pyyaml>=6.0 python-dotenv>=0.19.0 colorama>=0.4.4 rich>=12.0.0
-pip install dnspython>=2.1.0 requests>=2.25.0 urllib3>=1.26.0 pandas>=1.3.0 jinja2>=3.0.0
-pip install validators>=0.18.0 pytest>=7.0.0 pytest-cov>=3.0.0
-```
-
-**PDF Generation Dependencies:**
-```bash
-# Choose one of the following:
-
-# Option 1: WeasyPrint (Better CSS support, easier to install)
-pip install weasyprint>=60.0
-
-# Option 2: PDFKit (Requires wkhtmltopdf system package)
-pip install pdfkit>=1.0.0
-
-# Optional: Chart generation for advanced reports
-pip install plotly>=5.0.0 matplotlib>=3.5.0
-```
-
-### Step 3: System Tools Installation
-
-**Security Tools:**
-```bash
-# Essential tools
-sudo apt install -y nmap nikto dirb gobuster sslscan
-
-# DNS tools
-sudo apt install -y dnsutils bind9-dnsutils
-
-# Additional tools (optional)
-sudo apt install -y masscan wfuzz sqlmap subfinder amass
-```
-
-**PDF Generation System Dependencies:**
-
-For WeasyPrint:
-```bash
-# Ubuntu/Debian
+# Install PDF generation dependencies (optional)
 sudo apt install -y python3-dev libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 libfribidi0 libfontconfig1
 
-# CentOS/RHEL
-sudo yum install -y python3-devel pango harfbuzz fribidi fontconfig
+# Install Python dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
 
-# macOS
-brew install pango harfbuzz fribidi fontconfig
+# Install PDF support (optional)
+pip install weasyprint
 ```
 
-For PDFKit:
+#### **CentOS/RHEL/Fedora**
 ```bash
-# Ubuntu/Debian
-sudo apt install -y wkhtmltopdf
+# Install core tools
+sudo dnf install -y nmap nikto dirb gobuster sslscan bind-utils
 
-# CentOS/RHEL
-sudo yum install -y wkhtmltopdf
+# Install WPScan via Ruby
+sudo dnf install -y ruby ruby-devel gcc make
+gem install wpscan
 
-# macOS
-brew install --cask wkhtmltopdf
+# Install Python dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install weasyprint
 ```
 
-### Step 4: Project Structure Setup
-
-**Create Directory Structure:**
+#### **macOS**
 ```bash
-mkdir -p {src/{core,scanners/{recon,vulnerability},utils,orchestrator},config,templates,output/{logs,reports,raw},tests/{unit,integration,fixtures}}
+# Install Homebrew (if not installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install security tools
+brew install nmap nikto dirb gobuster sslscan wpscan
+
+# Install Python dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install weasyprint
 ```
 
-**Create Configuration Files:**
+---
+
+## 🔍 **WordPress Scanner Setup**
+
+### **WPScan API Token (Recommended)**
+
+For enhanced vulnerability detection, get a free API token:
+
+1. **Register** at [https://wpscan.com/api](https://wpscan.com/api)
+2. **Get your token** (free tier: 25 requests/day)
+3. **Set environment variable**:
+   ```bash
+   export WPSCAN_API_TOKEN="your_api_token_here"
+   
+   # Make it permanent
+   echo 'export WPSCAN_API_TOKEN="your_api_token_here"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+### **Verify WPScan Installation**
 ```bash
-# Create .env file
-cat > .env << 'EOF'
-# General Settings
-DEBUG=False
-LOG_LEVEL=INFO
-OUTPUT_DIR=./output
+# Check if WPScan is installed
+wpscan --version
 
-# Scan Settings
-MAX_THREADS=10
-TIMEOUT=30
-RATE_LIMIT=100
+# Test basic functionality
+wpscan --help
 
-# Tool Paths (auto-detected)
-NMAP_PATH=nmap
-NIKTO_PATH=nikto
-DIRB_PATH=dirb
-GOBUSTER_PATH=gobuster
-SSLSCAN_PATH=sslscan
-EOF
-
-# Create .gitignore
-cat > .gitignore << 'EOF'
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-dist/
-*.egg-info/
-.pytest_cache/
-
-# Project specific
-output/
-*.log
-.env
-*.db
-*.sqlite
-custom_branding.json
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-
-# Reports
-reports/
-*.pdf
-*.html
-EOF
+# Test with a WordPress site (with API token)
+wpscan --url https://wordpress.org --api-token $WPSCAN_API_TOKEN
 ```
 
-### Step 5: Test Installation
+---
 
-**Basic Tests:**
+## 📚 **Usage Examples**
+
+### **Basic WordPress Scan**
 ```bash
-# Test Python version
-python --version
+# Simple WordPress scan
+python3 main.py wordpress example.com
 
-# Test core dependencies
-python -c "import click, rich, dnspython, requests, jinja2; print('✓ Core dependencies OK')"
+# WordPress scan with all report formats
+python3 main.py wordpress example.com --all-reports
 
-# Test PDF dependencies
-python -c "import weasyprint; print('✓ WeasyPrint OK')" 2>/dev/null || echo "⚠ WeasyPrint not available"
-python -c "import pdfkit; print('✓ PDFKit OK')" 2>/dev/null || echo "⚠ PDFKit not available"
-
-# Test system tools
-which nmap && echo "✓ nmap available" || echo "✗ nmap missing"
-which nikto && echo "✓ nikto available" || echo "✗ nikto missing"
-which dirb && echo "✓ dirb available" || echo "✗ dirb missing"
+# WordPress scan with WPScan API token
+python3 main.py wordpress example.com --wpscan-api-token YOUR_TOKEN --all-reports
 ```
 
-**Comprehensive Verification:**
+### **Advanced WordPress Scanning**
 ```bash
-# Run full verification
-python verify_installation.py
+# Comprehensive WordPress security assessment
+python3 main.py wordpress https://blog.example.com \
+  --enumerate-plugins \
+  --enumerate-themes \
+  --enumerate-users \
+  --wpscan-api-token YOUR_TOKEN \
+  --all-reports
 
-# Test CLI interface
-python main.py --help
-python main.py list-tools
-python main.py info
+# Quick enumeration without WPScan
+python3 main.py wordpress example.com \
+  --no-use-wpscan \
+  --html-report
+
+# Custom port and scheme
+python3 main.py wordpress example.com \
+  --scheme http \
+  --port 8080 \
+  --pdf-report
 ```
 
-### Step 6: First Test Run
-
-**Basic Functionality Test:**
+### **Report Generation**
 ```bash
-# Test port scan
-python main.py scan 127.0.0.1 --include-port --ports 22,80,443
+# Generate specific report formats
+python3 main.py wordpress example.com --json-report
+python3 main.py wordpress example.com --html-report  
+python3 main.py wordpress example.com --pdf-report
+python3 main.py wordpress example.com --all-reports
 
-# Test with HTML report
-python main.py scan 127.0.0.1 --include-port --html-report
-
-# Test with PDF report (if PDF support installed)
-python main.py scan 127.0.0.1 --include-port --pdf-report
-
-# Test all reports
-python main.py scan scanme.nmap.org --profile quick --all-reports
+# Custom output directory
+python3 main.py wordpress example.com \
+  --all-reports \
+  --output-dir /path/to/reports
 ```
 
-## 🔧 Advanced Configuration
+---
 
-### Custom Branding Setup
+## 🔧 **Troubleshooting**
 
-**Create Custom Branding File:**
+### **WPScan Installation Issues**
+
+#### **Problem: `wpscan: command not found`**
 ```bash
-cp custom_branding_example.json my_company_branding.json
-# Edit the file with your company details
+# Solution 1: Install via apt (Ubuntu/Debian)
+sudo apt update && sudo apt install wpscan
 
-# Use custom branding
-python main.py scan target.com --custom-branding my_company_branding.json --pdf-report
+# Solution 2: Install via Ruby gem
+sudo apt install ruby ruby-dev
+gem install wpscan
+
+# Solution 3: Add gem binary to PATH
+echo 'export PATH="$HOME/.gem/ruby/$(ruby -e "puts RUBY_VERSION")/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 ```
 
-### Performance Tuning
-
-**For High-Performance Scanning:**
+#### **Problem: WPScan permission errors**
 ```bash
-# Increase system limits
-echo "* soft nofile 65536" | sudo tee -a /etc/security/limits.conf
-echo "* hard nofile 65536" | sudo tee -a /etc/security/limits.conf
+# Install for current user only
+gem install --user-install wpscan
 
-# Optimize Python
-export PYTHONOPTIMIZE=1
-export PYTHONDONTWRITEBYTECODE=1
-
-# Use parallel scanning
-python main.py scan target.com --profile full --parallel
+# Or use system-wide installation
+sudo gem install wpscan
 ```
 
-### Docker Installation (Optional)
+#### **Problem: WPScan API issues**
+```bash
+# Test API connectivity
+curl -H "Authorization: Token YOUR_API_TOKEN" https://wpscan.com/api/v3/status
 
-**Create Dockerfile:**
+# Verify token is set
+echo $WPSCAN_API_TOKEN
+
+# Set token temporarily
+export WPSCAN_API_TOKEN="your_token"
+```
+
+### **PDF Generation Issues**
+
+#### **Problem: PDF generation fails**
+```bash
+# Install WeasyPrint dependencies (Ubuntu/Debian)
+sudo apt install python3-dev libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 libfribidi0 libfontconfig1
+pip install weasyprint
+
+# Alternative: Use PDFKit
+sudo apt install wkhtmltopdf
+pip install pdfkit
+```
+
+### **General Troubleshooting**
+```bash
+# Run comprehensive verification
+python3 verify_installation.py
+
+# Check individual components
+python3 -c "from src.scanners.cms.wordpress_scanner import WordPressScanner; print('✓ WordPress scanner OK')"
+
+# Test CLI integration
+python3 main.py wordpress --help
+
+# Check logs for detailed error information
+python3 main.py wordpress example.com --debug
+```
+
+---
+
+## 🐳 **Docker Support**
+
+### **Using Docker for WPScan**
+```bash
+# Pull WPScan Docker image
+docker pull wpscanteam/wpscan
+
+# Use with framework (if WPScan not installed locally)
+docker run -it --rm wpscanteam/wpscan --url https://example.com --enumerate p,t,u
+```
+
+### **Framework Docker Build**
 ```dockerfile
 FROM python:3.9-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \\
-    nmap nikto dirb gobuster sslscan dnsutils \\
-    python3-dev libpango-1.0-0 libharfbuzz0b \\
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies including WPScan
+RUN apt-get update && apt-get install -y \
+    nmap nikto dirb gobuster sslscan dnsutils \
+    ruby ruby-dev gcc make \
+    && gem install wpscan \
+    && apt-get clean
 
-# Copy project files
-COPY . /app
 WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-RUN pip install -r requirements.txt
-
-# Run application
+COPY . .
 ENTRYPOINT ["python", "main.py"]
 ```
 
-**Build and Run:**
+---
+
+## ✅ **Verification Checklist**
+
+Before using the WordPress scanner, ensure:
+
+- [ ] **WPScan installed**: `wpscan --version` works
+- [ ] **Python dependencies**: `pip install -r requirements.txt` completed
+- [ ] **Project structure**: `python3 verify_installation.py` passes
+- [ ] **CLI integration**: `python3 main.py wordpress --help` shows options
+- [ ] **API token configured**: `echo $WPSCAN_API_TOKEN` shows your token
+- [ ] **PDF generation**: At least one PDF library installed (weasyprint/pdfkit)
+
+---
+
+## 🎯 **What's New in Phase 1.1**
+
+### **WordPress Security Scanner Features**
+- ✅ **WordPress Detection**: Intelligent WordPress installation detection
+- ✅ **Version Fingerprinting**: WordPress version identification and vulnerability assessment
+- ✅ **Plugin Enumeration**: Discovery and security analysis of WordPress plugins
+- ✅ **Theme Analysis**: WordPress theme enumeration and security evaluation
+- ✅ **User Enumeration**: WordPress user discovery using multiple techniques
+- ✅ **WPScan Integration**: Full integration with WPScan vulnerability database
+- ✅ **Security Configuration**: Analysis of WordPress security settings
+- ✅ **XML-RPC Testing**: XML-RPC endpoint security assessment
+- ✅ **Professional Reporting**: Multi-format reports (HTML, PDF, JSON, TXT)
+
+### **Enhanced CLI Interface**
 ```bash
-docker build -t auto-pentest .
-docker run -v $(pwd)/output:/app/output auto-pentest scan target.com --all-reports
+# New WordPress-specific command
+python3 main.py wordpress TARGET [OPTIONS]
+
+# Enhanced reporting options
+--html-report    # Generate HTML report
+--pdf-report     # Generate PDF report  
+--all-reports    # Generate all formats
+--json-report    # Generate JSON report (default)
 ```
 
-## 🐛 Troubleshooting
+### **Framework Improvements**
+- ✅ **Scanner Registry**: Dynamic scanner discovery and management
+- ✅ **Workflow Integration**: WordPress scanner integrated into orchestration engine
+- ✅ **Enhanced Error Handling**: Improved error reporting and recovery
+- ✅ **Configuration Management**: WPScan configuration in tools_config.yaml
+- ✅ **Comprehensive Testing**: Full test suite for WordPress scanner
 
-### Common Issues and Solutions
+---
 
-**1. PDF Generation Fails**
-```bash
-# Check PDF dependencies
-python -c "import weasyprint" 2>/dev/null && echo "WeasyPrint OK" || echo "WeasyPrint missing"
-python -c "import pdfkit" 2>/dev/null && echo "PDFKit OK" || echo "PDFKit missing"
+## 🔮 **Coming Next: Phase 1.2**
 
-# Install missing dependencies
-pip install weasyprint  # OR pip install pdfkit
+The next phase will include:
+- **Drupal Scanner**: Comprehensive Drupal security assessment
+- **Joomla Scanner**: Joomla vulnerability detection and analysis
+- **CMS Auto-Detection**: Intelligent CMS identification
+- **Enhanced Workflows**: Multi-CMS scanning workflows
 
-# System dependencies for WeasyPrint
-sudo apt install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0
-```
+---
 
-**2. Permission Denied Errors**
-```bash
-# For nmap raw socket scanning
-sudo python main.py scan target.com
-
-# Or set capabilities (Linux only)
-sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which nmap)
-```
-
-**3. DNS Resolution Issues**
-```bash
-# Test DNS manually
-dig google.com
-nslookup google.com
-
-# Check system DNS
-cat /etc/resolv.conf
-
-# Use custom DNS server
-python main.py dns target.com --dns-server 8.8.8.8
-```
-
-**4. Import Errors**
-```bash
-# Add project to Python path
-export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
-
-# Or use development install
-pip install -e .
-```
-
-**5. Tool Not Found Errors**
-```bash
-# Check tool availability
-python main.py list-tools
-
-# Install missing tools
-sudo apt install -y <missing-tool>
-
-# Use custom tool paths
-export NMAP_PATH=/usr/local/bin/nmap
-```
-
-### Performance Issues
-
-**Memory Usage:**
-```bash
-# Monitor memory usage during scans
-python main.py scan target.com --profile full &
-top -p $!
-
-# Reduce thread count if needed
-python main.py scan target.com --profile full --max-threads 5
-```
-
-**Timeout Issues:**
-```bash
-# Increase timeouts for slow networks
-python main.py scan target.com --timeout 600
-
-# Use sequential scanning for stability
-python main.py scan target.com --profile full --sequential
-```
-
-## 📊 Usage Examples
-
-### Basic Scanning
-```bash
-# Quick scan with all reports
-python main.py quick target.com
-
-# Full scan with parallel execution
-python main.py full target.com
-
-# Custom scan with specific components
-python main.py scan target.com --include-web --include-ssl --pdf-report
-```
-
-### Advanced Reporting
-```bash
-# Generate PDF report with custom branding
-python main.py scan target.com --pdf-report --custom-branding company.json
-
-# Compliance report
-python main.py scan target.com --compliance-report pci_dss
-
-# All report formats
-python main.py scan target.com --all-reports
-
-# Generate reports from existing results
-python main.py generate-report scan_results.json --pdf --html
-```
-
-### Integration Examples
-```bash
-# CI/CD pipeline
-python main.py scan $TARGET --profile web --json-output results.json
-python main.py generate-report results.json --pdf --output-dir ./reports
-
-# Scheduled scanning
-0 2 * * * cd /path/to/auto-pentest && python main.py scan target.com --all-reports
-```
-
-## ✅ Verification Checklist
-
-- [ ] Python 3.8+ installed
-- [ ] Virtual environment created and activated
-- [ ] All Python dependencies installed (`pip list`)
-- [ ] System tools available (`python main.py list-tools`)
-- [ ] PDF generation working (`python -c "import weasyprint"`)
-- [ ] Basic scan successful (`python main.py scan 127.0.0.1`)
-- [ ] Reports generating (`--html-report --pdf-report`)
-- [ ] No permission errors
-- [ ] Output directory writable
-
-## 🎯 Next Steps
-
-1. **Read the Documentation**: Check project documentation for detailed usage
-2. **Run Test Scans**: Start with safe targets like `scanme.nmap.org`
-3. **Customize Configuration**: Adapt settings for your environment
-4. **Setup Automation**: Create scripts for regular scanning
-5. **Explore Advanced Features**: Try compliance reports and custom branding
-
-## 📞 Support
+## 🆘 **Getting Help**
 
 If you encounter issues:
-1. Check this troubleshooting guide
-2. Run `python verify_installation.py` for diagnostics
-3. Review logs in `output/logs/`
-4. Check system requirements and dependencies
-5. Consult project documentation
 
-**System Information for Support:**
-```bash
-# Gather system info for troubleshooting
-python --version
-pip freeze | grep -E "(weasyprint|pdfkit|jinja2|click|rich)"
-python main.py list-tools
-uname -a
-```
+1. **Run verification**: `python3 verify_installation.py`
+2. **Check logs**: Enable debug mode with `--debug` flag
+3. **Update tools**: Ensure all security tools are up to date
+4. **Check dependencies**: Verify all required packages are installed
+5. **API token**: Ensure WPScan API token is properly configured
+
+For detailed troubleshooting, check the logs in `output/logs/` directory.

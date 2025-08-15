@@ -686,62 +686,6 @@ class WordPressScanner(ScannerBase):
             log_error(f"User enumeration failed: {e}")
             result.errors.append(f"User enumeration error: {str(e)}")
 
-    def _run_wpscan(
-        self, target_url: str, result: ScanResult, options: Dict[str, Any]
-    ) -> None:
-        """
-        Run WPScan for comprehensive vulnerability assessment
-
-        Args:
-            target_url: Target URL
-            result: ScanResult to populate
-            options: Scan options
-        """
-        try:
-            if not self._check_wpscan_available()["available"]:
-                log_warning("WPScan not available, skipping WPScan analysis")
-                return
-
-            log_info("Running WPScan for comprehensive analysis...")
-
-            # Build WPScan command
-            cmd = [
-                "wpscan",
-                "--url",
-                target_url,
-                "--format",
-                "json",
-                "--no-banner",
-                "--random-user-agent",
-            ]
-
-            # Add enumeration options
-            if options.get("enumerate_plugins", True):
-                cmd.extend(["--enumerate", "p"])
-            if options.get("enumerate_themes", True):
-                cmd.extend(["--enumerate", "t"])
-            if options.get("enumerate_users", True):
-                cmd.extend(["--enumerate", "u"])
-
-            # Add API token if provided
-            api_token = options.get("wpscan_api_token")
-            if api_token:
-                cmd.extend(["--api-token", api_token])
-
-            # Execute WPScan
-            wpscan_result = self.executor.execute_command(cmd, timeout=300)
-
-            if wpscan_result.returncode == 0 and wpscan_result.stdout:
-                self._parse_wpscan_output(wpscan_result.stdout, result)
-                result.raw_output += f"\n--- WPScan Output ---\n{wpscan_result.stdout}"
-            else:
-                log_warning(f"WPScan execution issues: {wpscan_result.stderr}")
-                result.errors.append(f"WPScan error: {wpscan_result.stderr}")
-
-        except Exception as e:
-            log_error(f"WPScan execution failed: {e}")
-            result.errors.append(f"WPScan execution error: {str(e)}")
-
     def _parse_wpscan_output(self, wpscan_output: str, result: ScanResult) -> None:
         """
         Parse WPScan JSON output and extract findings
@@ -895,17 +839,223 @@ class WordPressScanner(ScannerBase):
             log_error(f"XML-RPC testing failed: {e}")
             result.errors.append(f"XML-RPC testing error: {str(e)}")
 
-    # Helper methods
     def _check_wpscan_available(self) -> Dict[str, Any]:
-        """Check if WPScan is available"""
+        """Check if WPScan is available with improved detection"""
         try:
-            result = self.executor.execute_command(["wpscan", "--version"], timeout=10)
-            if result.returncode == 0:
-                version = result.stdout.strip()
-                return {"available": True, "version": version}
-        except:
-            pass
-        return {"available": False, "version": "Not installed"}
+            import shutil
+
+            # Method 1: Check using shutil.which
+            wpscan_path = shutil.which("wpscan")
+            if wpscan_path:
+                log_info(f"Found WPScan at: {wpscan_path}")
+                try:
+                    # FIXED: Use correct method name
+                    result = self.executor.execute(["wpscan", "--version"], timeout=10)
+                    if result.success:  # FIXED: Use .success instead of .success
+                        version_line = (
+                            result.stdout.strip().split("\n")[0]
+                            if result.stdout
+                            else "Unknown"
+                        )
+                        log_success(f"WPScan version: {version_line}")
+                        return {
+                            "available": True,
+                            "version": version_line,
+                            "path": wpscan_path,
+                        }
+                    else:
+                        log_warning(
+                            f"WPScan found but version check failed: {result.stderr}"
+                        )
+                        return {
+                            "available": True,
+                            "version": "Unknown",
+                            "path": wpscan_path,
+                        }
+                except Exception as e:
+                    log_warning(f"WPScan found but version check error: {e}")
+                    return {
+                        "available": True,
+                        "version": "Unknown",
+                        "path": wpscan_path,
+                    }
+
+            # Method 2: Check common paths
+            common_paths = [
+                "/usr/bin/wpscan",
+                "/usr/local/bin/wpscan",
+                "/opt/wpscan/wpscan",
+                "~/.local/bin/wpscan",
+                "/usr/local/rvm/gems/default/bin/wpscan",
+                "/home/.rvm/gems/default/bin/wpscan",
+            ]
+
+            import os
+
+            for path in common_paths:
+                expanded_path = os.path.expanduser(path)
+                if os.path.isfile(expanded_path) and os.access(expanded_path, os.X_OK):
+                    log_info(f"Found WPScan at: {expanded_path}")
+                    try:
+                        # FIXED: Use correct method name
+                        result = self.executor.execute(
+                            [expanded_path, "--version"], timeout=10
+                        )
+                        if result.success:  # FIXED: Use .success
+                            version_line = (
+                                result.stdout.strip().split("\n")[0]
+                                if result.stdout
+                                else "Unknown"
+                            )
+                            log_success(f"WPScan version: {version_line}")
+                            return {
+                                "available": True,
+                                "version": version_line,
+                                "path": expanded_path,
+                            }
+                    except:
+                        pass
+
+            # Method 3: Check if it's a gem
+            try:
+                # FIXED: Use correct method name
+                result = self.executor.execute(["gem", "list", "wpscan"], timeout=10)
+                if (
+                    result.success and "wpscan" in result.stdout.lower()
+                ):  # FIXED: Use .success
+                    log_info("WPScan found as Ruby gem")
+                    try:
+                        # FIXED: Use correct method name
+                        version_result = self.executor.execute(
+                            ["wpscan", "--version"], timeout=10
+                        )
+                        if version_result.success:  # FIXED: Use .success
+                            version_line = (
+                                version_result.stdout.strip().split("\n")[0]
+                                if version_result.stdout
+                                else "Unknown"
+                            )
+                            return {
+                                "available": True,
+                                "version": version_line,
+                                "path": "gem",
+                            }
+                    except:
+                        pass
+            except:
+                pass
+
+            # Method 4: Try direct execution
+            try:
+                # FIXED: Use correct method name
+                result = self.executor.execute(["wpscan", "--help"], timeout=5)
+                if (
+                    result.success and "wordpress" in result.stdout.lower()
+                ):  # FIXED: Use .success
+                    log_info("WPScan responds to direct execution")
+                    return {"available": True, "version": "Unknown", "path": "system"}
+            except:
+                pass
+
+            log_warning("WPScan not found in system")
+            return {"available": False, "version": "Not installed"}
+
+        except Exception as e:
+            log_error(f"Error checking WPScan availability: {e}")
+            return {"available": False, "version": f"Check failed: {str(e)}"}
+
+    def _run_wpscan(
+        self, target_url: str, result: ScanResult, options: Dict[str, Any]
+    ) -> None:
+        """Run WPScan for comprehensive vulnerability assessment"""
+        try:
+            if not self._check_wpscan_available()["available"]:
+                log_warning("WPScan not available, skipping WPScan analysis")
+                return
+
+            log_info("Running WPScan for comprehensive analysis...")
+
+            # Build WPScan command
+            cmd = [
+                "wpscan",
+                "--url",
+                target_url,
+                "--format",
+                "json",
+                "--no-banner",
+                "--random-user-agent",
+            ]
+
+            # Add enumeration options
+            if options.get("enumerate_plugins", True):
+                cmd.extend(["--enumerate", "p"])
+            if options.get("enumerate_themes", True):
+                cmd.extend(["--enumerate", "t"])
+            if options.get("enumerate_users", True):
+                cmd.extend(["--enumerate", "u"])
+
+            # Add API token if provided
+            api_token = options.get("wpscan_api_token")
+            if api_token:
+                cmd.extend(["--api-token", api_token])
+
+            # FIXED: Use correct method name
+            wpscan_result = self.executor.execute(cmd, timeout=300)
+
+            # FIXED: Use .success instead of .success
+            if wpscan_result.success and wpscan_result.stdout:
+                self._parse_wpscan_output(wpscan_result.stdout, result)
+                result.raw_output += f"\n--- WPScan Output ---\n{wpscan_result.stdout}"
+            else:
+                log_warning(f"WPScan execution issues: {wpscan_result.stderr}")
+                result.errors.append(f"WPScan error: {wpscan_result.stderr}")
+
+        except Exception as e:
+            log_error(f"WPScan execution failed: {e}")
+            result.errors.append(f"WPScan execution error: {str(e)}")
+
+        """Check if WPScan is available with improved detection"""
+        try:
+            import shutil
+
+            # Method 1: Check using shutil.which
+            wpscan_path = shutil.which("wpscan")
+            if wpscan_path:
+                log_info(f"Found WPScan at: {wpscan_path}")
+                try:
+                    # Try to get version
+                    result = self.executor.execute(["wpscan", "--version"], timeout=10)
+                    if result.success:
+                        version_line = (
+                            result.stdout.strip().split("\n")[0]
+                            if result.stdout
+                            else "Unknown"
+                        )
+                        log_success(f"WPScan version: {version_line}")
+                        return {
+                            "available": True,
+                            "version": version_line,
+                            "path": wpscan_path,
+                        }
+                    else:
+                        log_warning(
+                            f"WPScan found but version check failed: {result.stderr}"
+                        )
+                        return {
+                            "available": True,
+                            "version": "Unknown",
+                            "path": wpscan_path,
+                        }
+                except Exception as e:
+                    log_warning(f"WPScan found but version check error: {e}")
+                    return {
+                        "available": True,
+                        "version": "Unknown",
+                        "path": wpscan_path,
+                    }
+        except Exception as e:
+            log_warning(f"WPScan found but version check error: {e}")
+            return {"available": True, "version": "Unknown", "path": wpscan_path}
 
     def _assess_version_security(self, version: str) -> ScanSeverity:
         """Assess WordPress version security status"""

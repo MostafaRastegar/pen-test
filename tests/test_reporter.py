@@ -29,7 +29,7 @@ try:
         reporter_available = True
     except ImportError:
         try:
-            from src.utils import ReportGenerator
+            from src.utils import reporter
 
             reporter_available = True
         except ImportError:

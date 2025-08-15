@@ -263,6 +263,13 @@ def clear_cache_command(all, scanner, force):
     help="URL scheme to use",
 )
 @click.option("--port", type=int, help="Target port (if not standard)")
+@click.option("--json-report", is_flag=True, help="Generate JSON report")
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
+@click.option("--pdf-report", is_flag=True, help="Generate PDF report")
+@click.option("--all-reports", is_flag=True, help="Generate all report formats")
+@click.option(
+    "--output-dir", default="output/reports", help="Output directory for reports"
+)
 @common_options
 def wordpress_command(
     target,
@@ -275,6 +282,11 @@ def wordpress_command(
     check_config,
     scheme,
     port,
+    json_report,
+    html_report,
+    pdf_report,
+    all_reports,
+    output_dir,
     **kwargs,
 ):
     """
@@ -290,22 +302,22 @@ def wordpress_command(
 
     Examples:
         \b
-        # Basic WordPress scan
-        python main.py wordpress example.com
+        # Basic WordPress scan with all reports
+        python main.py wordpress example.com --all-reports
 
         # Comprehensive scan with WPScan API
-        python main.py wordpress https://blog.example.com --wpscan-api-token YOUR_TOKEN
+        python main.py wordpress https://blog.example.com --wpscan-api-token YOUR_TOKEN --all-reports
 
-        # Quick enumeration without WPScan
-        python main.py wordpress example.com --no-use-wpscan
+        # Quick enumeration without WPScan, HTML report only
+        python main.py wordpress example.com --no-use-wpscan --html-report
 
-        # Custom port and scheme
-        python main.py wordpress example.com --scheme http --port 8080
+        # Custom port and scheme with PDF report
+        python main.py wordpress example.com --scheme http --port 8080 --pdf-report
     """
     try:
         from ..scanners.cms.wordpress_scanner import WordPressScanner
-        from ..utils.logger import log_info, log_success, log_error
-        from ..utils.reporter import ReportGenerator
+        from ..utils.logger import log_info, log_success, log_error, log_warning
+        from ..utils.reporter import ReportGenerator  # FIXED: Use ReportGenerator
         from pathlib import Path
         import json
 
@@ -338,8 +350,8 @@ def wordpress_command(
         log_success(f"✅ WordPress scan completed")
         log_info(f"📊 Total findings: {len(result.findings)}")
 
+        severity_counts = {}
         if result.findings:
-            severity_counts = {}
             for finding in result.findings:
                 severity = finding.get("severity", "info")
                 severity_counts[severity] = severity_counts.get(severity, 0) + 1
@@ -347,65 +359,103 @@ def wordpress_command(
             for severity, count in severity_counts.items():
                 log_info(f"   {severity.upper()}: {count}")
 
-        # Generate reports
-        output_dir = Path(kwargs.get("output_dir", "output/reports"))
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Prepare output directory
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
 
-        # JSON report (always generated)
-        json_file = (
-            output_dir
-            / f"wordpress_scan_{target.replace('://', '_').replace('/', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.json"
-        )
-        result.save_to_file(json_file)
-        log_success(f"📄 JSON report saved: {json_file}")
+        # Generate base filename
+        clean_target = target.replace("://", "_").replace("/", "_").replace(":", "_")
+        timestamp = result.start_time.strftime("%Y%m%d_%H%M%S")
+        base_filename = f"wordpress_scan_{clean_target}_{timestamp}"
 
-        # Generate additional reports if requested
-        if kwargs.get("html_report") or kwargs.get("all_reports"):
+        # Determine which reports to generate
+        generate_json = (
+            json_report or all_reports or True
+        )  # Always generate JSON as default
+        generate_html = html_report or all_reports
+        generate_pdf = pdf_report or all_reports
+
+        # Initialize report generator
+        reporter = ReportGenerator()
+        generated_reports = []
+
+        # 1. JSON report (always generated)
+        if generate_json:
+            json_file = output_path / f"{base_filename}.json"
+            result.save_to_file(json_file)
+            log_success(f"📄 JSON report saved: {json_file}")
+            generated_reports.append(str(json_file))
+
+        # 2. HTML report
+        if generate_html:
             try:
-                reporter = ReportGenerator()
-                html_file = (
-                    output_dir
-                    / f"wordpress_scan_{target.replace('://', '_').replace('/', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.html"
+                html_file = output_path / f"{base_filename}.html"
+
+                # FIXED: Use correct method name and parameters
+                success = reporter.generate_html_report(
+                    results=result,  # Pass the ScanResult object
+                    output_path=html_file,
+                    title=f"WordPress Security Scan - {target}",
                 )
 
-                # Convert result to format expected by reporter
-                report_data = {
-                    "target": target,
-                    "scan_type": "WordPress Security Scan",
-                    "timestamp": result.start_time.isoformat(),
-                    "duration": (
-                        str(result.end_time - result.start_time)
-                        if result.end_time
-                        else "Unknown"
-                    ),
-                    "findings": result.findings,
-                    "summary": {
-                        "total_findings": len(result.findings),
-                        "severity_counts": severity_counts,
-                        "scanner_used": result.scanner_name,
-                    },
-                }
-
-                reporter.generate_html_report(report_data, html_file)
-                log_success(f"📄 HTML report saved: {html_file}")
+                if success:
+                    log_success(f"📄 HTML report saved: {html_file}")
+                    generated_reports.append(str(html_file))
+                else:
+                    log_error("❌ Failed to generate HTML report")
 
             except Exception as e:
-                log_error(f"Failed to generate HTML report: {e}")
+                log_error(f"❌ HTML report generation failed: {e}")
 
-        if kwargs.get("pdf_report") or kwargs.get("all_reports"):
+        # 3. PDF report
+        if generate_pdf:
             try:
-                reporter = ReportGenerator()
-                pdf_file = (
-                    output_dir
-                    / f"wordpress_scan_{target.replace('://', '_').replace('/', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.pdf"
+                pdf_file = output_path / f"{base_filename}.pdf"
+
+                # FIXED: Use correct method name and parameters
+                success = reporter.generate_pdf_report(
+                    results=result,  # Pass the ScanResult object
+                    output_path=pdf_file,
+                    title=f"WordPress Security Scan - {target}",
                 )
-                reporter.generate_pdf_report(report_data, pdf_file)
-                log_success(f"📄 PDF report saved: {pdf_file}")
+
+                if success:
+                    log_success(f"📄 PDF report saved: {pdf_file}")
+                    generated_reports.append(str(pdf_file))
+                else:
+                    log_warning(
+                        "⚠️  PDF report generation failed (might need PDF dependencies)"
+                    )
+                    log_info("Install: pip install weasyprint  OR  pip install pdfkit")
 
             except Exception as e:
-                log_error(f"Failed to generate PDF report: {e}")
+                log_error(f"❌ PDF report generation failed: {e}")
+                if "weasyprint" in str(e).lower() or "pdfkit" in str(e).lower():
+                    log_info("💡 Install PDF dependencies: pip install weasyprint")
 
-        # Display quick summary of critical findings
+        # 4. Executive summary (if multiple reports requested)
+        if all_reports:
+            try:
+                summary_file = output_path / f"{base_filename}_summary.txt"
+
+                success = reporter.generate_executive_summary(
+                    results=result, output_path=summary_file
+                )
+
+                if success:
+                    log_success(f"📄 Executive summary saved: {summary_file}")
+                    generated_reports.append(str(summary_file))
+
+            except Exception as e:
+                log_warning(f"⚠️  Executive summary generation failed: {e}")
+
+        # Summary of generated reports
+        if len(generated_reports) > 1:
+            log_success(f"📁 Generated {len(generated_reports)} reports:")
+            for report in generated_reports:
+                log_info(f"   📄 {report}")
+
+        # Display security summary
         critical_findings = [
             f for f in result.findings if f.get("severity") == "critical"
         ]
@@ -415,14 +465,26 @@ def wordpress_command(
             log_error(f"🚨 {len(critical_findings)} CRITICAL vulnerabilities found!")
             for finding in critical_findings[:3]:  # Show first 3
                 log_error(f"   • {finding.get('title', 'Unknown')}")
+            if len(critical_findings) > 3:
+                log_error(f"   • ... and {len(critical_findings) - 3} more")
 
         if high_findings:
-            log_error(f"⚠️  {len(high_findings)} HIGH severity issues found!")
+            log_warning(f"⚠️  {len(high_findings)} HIGH severity issues found!")
             for finding in high_findings[:3]:  # Show first 3
-                log_error(f"   • {finding.get('title', 'Unknown')}")
+                log_warning(f"   • {finding.get('title', 'Unknown')}")
+            if len(high_findings) > 3:
+                log_warning(f"   • ... and {len(high_findings) - 3} more")
 
         if not critical_findings and not high_findings:
             log_success("✅ No critical or high severity vulnerabilities detected")
+
+        # Display recommendations
+        if critical_findings or high_findings:
+            log_info("\n💡 Recommendations:")
+            log_info("   1. Address critical and high severity issues immediately")
+            log_info("   2. Keep WordPress, plugins, and themes updated")
+            log_info("   3. Implement strong passwords and two-factor authentication")
+            log_info("   4. Regular security monitoring and scanning")
 
         # Exit with appropriate code
         if critical_findings:

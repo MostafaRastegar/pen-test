@@ -232,6 +232,12 @@ def clear_cache_command(all, scanner, force):
 @click.command()
 @click.argument("target")
 @click.option(
+    "--test-brute-force",
+    is_flag=True,
+    default=True,
+    help="Test brute force protection mechanisms",
+)
+@click.option(
     "--enumerate-plugins",
     is_flag=True,
     default=True,

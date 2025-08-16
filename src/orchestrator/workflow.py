@@ -628,6 +628,7 @@ def create_cms_workflow(target: str, workflow_id: Optional[str] = None) -> ScanW
         "use_wpscan": True,
         "check_xmlrpc": True,
         "check_config": True,
+        "test_brute_force": True,  # NEW: Enable brute force protection testing
     }
 
     workflow.add_scan_task(
@@ -686,6 +687,7 @@ def create_wordpress_workflow(
         "use_wpscan": True,
         "check_xmlrpc": True,
         "check_config": True,
+        "test_brute_force": True,  # NEW: Enable brute force protection testing
         "plugins_detection": "aggressive",
         "plugins_version_detection": "aggressive",
     }

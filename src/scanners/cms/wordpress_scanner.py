@@ -200,7 +200,11 @@ class WordPressScanner(ScannerBase):
 
             # Step 3: Plugin Enumeration
             if options.get("enumerate_plugins", True):
+                plugins_found = self._enumerate_plugins(target_url, result, options)
                 self._enumerate_plugins(target_url, result, options)
+
+                if plugins_found:
+                    self._analyze_plugin_security(plugins_found, result)
 
             # Step 4: Theme Enumeration
             if options.get("enumerate_themes", True):
@@ -691,6 +695,10 @@ class WordPressScanner(ScannerBase):
                 "updraftplus",
                 "elementor",
                 "woocommerce",
+                "wp-file-manager",
+                "social-warfare",
+                "mailpoet",
+                "revslider",
             ]
 
             for plugin in common_plugins:
@@ -703,8 +711,17 @@ class WordPressScanner(ScannerBase):
                         200,
                         403,
                     ]:  # 403 often means plugin exists but is protected
-                        plugins_found.append(plugin)
-                        log_info(f"  ✓ Found plugin: {plugin}")
+                        # Try to get plugin version
+                        plugin_version = self._get_plugin_version(target_url, plugin)
+
+                        plugin_info = {
+                            "name": plugin,
+                            "version": plugin_version,
+                            "path": f"/wp-content/plugins/{plugin}/",
+                            "detection_method": "Directory enumeration",
+                        }
+                        plugins_found.append(plugin_info)
+                        log_info(f"  ✓ Found plugin: {plugin} (v{plugin_version})")
                 except:
                     continue
 
@@ -719,21 +736,46 @@ class WordPressScanner(ScannerBase):
                         r"/wp-content/plugins/([^/]+)/", content
                     )
                     for plugin in set(plugin_matches):
-                        if plugin not in plugins_found:
-                            plugins_found.append(plugin)
+                        # Check if already found
+                        if not any(p["name"] == plugin for p in plugins_found):
+                            plugin_version = self._get_plugin_version(
+                                target_url, plugin
+                            )
+
+                            plugin_info = {
+                                "name": plugin,
+                                "version": plugin_version,
+                                "path": f"/wp-content/plugins/{plugin}/",
+                                "detection_method": "HTML source analysis",
+                            }
+                            plugins_found.append(plugin_info)
 
             except Exception as e:
                 log_warning(f"Could not parse HTML for plugins: {e}")
 
-            # Add findings for discovered plugins
+            # Add individual findings for each discovered plugin
             if plugins_found:
+                for plugin in plugins_found:
+                    result.add_finding(
+                        "WordPress Plugin Detected",
+                        f"Plugin '{plugin['name']}' detected (Version: {plugin['version']})",
+                        ScanSeverity.INFO,
+                        plugin_name=plugin["name"],
+                        plugin_version=plugin["version"],
+                        plugin_path=plugin["path"],
+                        detection_method=plugin["detection_method"],
+                        recommendation="Keep plugin updated to latest version",
+                    )
+
+                # Add summary finding
+                plugin_names = [p["name"] for p in plugins_found]
                 result.add_finding(
-                    "WordPress Plugins Detected",
-                    f"Found {len(plugins_found)} WordPress plugins: {', '.join(plugins_found)}",
+                    "WordPress Plugins Summary",
+                    f"Found {len(plugins_found)} WordPress plugins: {', '.join(plugin_names)}",
                     ScanSeverity.INFO,
-                    plugins=plugins_found,
-                    count=len(plugins_found),
-                    recommendation="Keep all plugins updated and remove unused plugins",
+                    total_plugins=len(plugins_found),
+                    plugin_list=plugin_names,
+                    recommendation="Regularly update all plugins and remove unused ones",
                 )
                 log_success(f"Found {len(plugins_found)} WordPress plugins")
             else:
@@ -747,6 +789,56 @@ class WordPressScanner(ScannerBase):
         except Exception as e:
             log_error(f"Plugin enumeration failed: {e}")
             result.errors.append(f"Plugin enumeration error: {str(e)}")
+
+    def _get_plugin_version(self, target_url: str, plugin_name: str) -> str:
+        """
+        Try to detect plugin version from various sources
+
+        Args:
+            target_url: Target URL
+            plugin_name: Plugin name
+
+        Returns:
+            str: Plugin version or 'Unknown'
+        """
+        try:
+            # Try readme.txt first
+            readme_url = f"{target_url}/wp-content/plugins/{plugin_name}/readme.txt"
+            response = self.session.get(readme_url, timeout=5)
+
+            if response.status_code == 200:
+                content = response.text
+
+                # Look for version patterns
+                version_patterns = [
+                    r"Stable tag:\s*([0-9.]+)",
+                    r"Version:\s*([0-9.]+)",
+                    r"Tested up to:\s*([0-9.]+)",
+                ]
+
+                for pattern in version_patterns:
+                    match = re.search(pattern, content, re.IGNORECASE)
+                    if match:
+                        return match.group(1)
+
+            # Try main plugin file
+            main_file_url = (
+                f"{target_url}/wp-content/plugins/{plugin_name}/{plugin_name}.php"
+            )
+            response = self.session.get(main_file_url, timeout=5)
+
+            if response.status_code == 200:
+                content = response.text
+                version_match = re.search(
+                    r"Version:\s*([0-9.]+)", content, re.IGNORECASE
+                )
+                if version_match:
+                    return version_match.group(1)
+
+        except:
+            pass
+
+        return "Unknown"
 
     def _enumerate_themes(
         self, target_url: str, result: ScanResult, options: Dict[str, Any]
@@ -2502,3 +2594,289 @@ class WordPressScanner(ScannerBase):
 
         except Exception as e:
             log_error(f"Database info leakage test failed: {e}")
+
+    def _analyze_plugin_security(self, plugins: List[Dict], result: ScanResult) -> None:
+        """
+        Analyze security status of detected WordPress plugins
+
+        Args:
+            plugins: List of detected plugins
+            result: ScanResult to populate with security findings
+        """
+        try:
+            log_info("Analyzing plugin security status...")
+
+            if not plugins:
+                log_info("No plugins detected for security analysis")
+                return
+
+            high_risk_plugins = []
+            outdated_plugins = []
+            unknown_plugins = []
+            vulnerable_plugins = []
+
+            for plugin in plugins:
+                plugin_name = plugin.get("name", "Unknown")
+                plugin_version = plugin.get("version", "Unknown")
+                plugin_path = plugin.get("path", "")
+
+                # Security risk assessment
+                security_issues = self._assess_plugin_security_risks(plugin)
+
+                # Check if plugin is in vulnerable plugins database
+                if self._is_vulnerable_plugin(plugin_name, plugin_version):
+                    vulnerable_plugins.append(plugin)
+                    result.add_finding(
+                        "Vulnerable Plugin Detected",
+                        f"Plugin '{plugin_name}' version {plugin_version} has known vulnerabilities",
+                        ScanSeverity.HIGH,
+                        plugin_name=plugin_name,
+                        plugin_version=plugin_version,
+                        plugin_path=plugin_path,
+                        vulnerability_risk="High",
+                        action_required="Immediate update or removal",
+                        recommendation="Update plugin to latest version or remove if not needed",
+                    )
+
+                # Check if plugin is outdated (no recent updates)
+                if self._is_outdated_plugin(plugin):
+                    outdated_plugins.append(plugin)
+                    result.add_finding(
+                        "Outdated Plugin Detected",
+                        f"Plugin '{plugin_name}' appears to be outdated or unmaintained",
+                        ScanSeverity.MEDIUM,
+                        plugin_name=plugin_name,
+                        plugin_version=plugin_version,
+                        maintenance_status="Potentially unmaintained",
+                        security_risk="Medium",
+                        recommendation="Review plugin necessity and consider alternatives",
+                    )
+
+                # Check for high-risk plugin characteristics
+                if security_issues["high_risk"]:
+                    high_risk_plugins.append(plugin)
+                    result.add_finding(
+                        "High-Risk Plugin Detected",
+                        f"Plugin '{plugin_name}' has high-risk characteristics: {', '.join(security_issues['risks'])}",
+                        ScanSeverity.MEDIUM,
+                        plugin_name=plugin_name,
+                        security_risks=", ".join(security_issues["risks"]),
+                        recommendation="Review plugin security practices and consider alternatives",
+                    )
+
+                # Check for unknown/custom plugins
+                if not self._is_known_plugin(plugin_name):
+                    unknown_plugins.append(plugin)
+                    result.add_finding(
+                        "Unknown/Custom Plugin Detected",
+                        f"Plugin '{plugin_name}' is not found in WordPress repository",
+                        ScanSeverity.LOW,
+                        plugin_name=plugin_name,
+                        plugin_source="Unknown/Custom",
+                        recommendation="Verify plugin source and security practices for custom plugins",
+                    )
+
+            # Summary findings
+            total_plugins = len(plugins)
+            if total_plugins > 0:
+                result.add_finding(
+                    "Plugin Security Summary",
+                    f"Analyzed {total_plugins} plugins: {len(vulnerable_plugins)} vulnerable, "
+                    f"{len(outdated_plugins)} outdated, {len(high_risk_plugins)} high-risk, "
+                    f"{len(unknown_plugins)} unknown/custom",
+                    (
+                        ScanSeverity.INFO
+                        if len(vulnerable_plugins) == 0
+                        else ScanSeverity.HIGH
+                    ),
+                    total_plugins=total_plugins,
+                    vulnerable_count=len(vulnerable_plugins),
+                    outdated_count=len(outdated_plugins),
+                    high_risk_count=len(high_risk_plugins),
+                    unknown_count=len(unknown_plugins),
+                    recommendation="Regularly update plugins and remove unused ones",
+                )
+
+            log_success(
+                f"Plugin security analysis completed. Found {len(vulnerable_plugins)} vulnerable plugins"
+            )
+
+        except Exception as e:
+            log_error(f"Plugin security analysis failed: {e}")
+            result.errors.append(f"Plugin security analysis error: {str(e)}")
+
+    def _assess_plugin_security_risks(self, plugin: Dict) -> Dict:
+        """
+        Assess security risks for a specific plugin
+
+        Args:
+            plugin: Plugin information dictionary
+
+        Returns:
+            Dict: Security risk assessment
+        """
+        plugin_name = plugin.get("name", "").lower()
+        plugin_path = plugin.get("path", "").lower()
+
+        risks = []
+        high_risk = False
+
+        # Known high-risk plugin patterns
+        high_risk_indicators = [
+            "file-manager",
+            "file-upload",
+            "code-execution",
+            "eval",
+            "shell",
+            "system",
+            "exec",
+            "backdoor",
+            "nulled",
+            "cracked",
+        ]
+
+        # Check plugin name for high-risk indicators
+        for indicator in high_risk_indicators:
+            if indicator in plugin_name:
+                risks.append(f"Contains high-risk keyword: {indicator}")
+                high_risk = True
+
+        # Check for suspicious plugin paths
+        suspicious_paths = ["mu-plugins", "uploads", "themes"]
+        for sus_path in suspicious_paths:
+            if sus_path in plugin_path and "wp-content/plugins" not in plugin_path:
+                risks.append(f"Unusual plugin location: {sus_path}")
+                high_risk = True
+
+        # Check for common vulnerable plugin names
+        vulnerable_patterns = [
+            "timthumb",
+            "revolution-slider",
+            "revslider",
+            "mailpoet",
+            "wp-file-manager",
+            "social-warfare",
+            "gdpr-compliance",
+        ]
+
+        for pattern in vulnerable_patterns:
+            if pattern in plugin_name:
+                risks.append(f"Plugin with known vulnerability history: {pattern}")
+                high_risk = True
+
+        return {"high_risk": high_risk, "risks": risks, "risk_score": len(risks)}
+
+    def _is_vulnerable_plugin(self, plugin_name: str, plugin_version: str) -> bool:
+        """
+        Check if plugin version is known to be vulnerable
+
+        Args:
+            plugin_name: Plugin name
+            plugin_version: Plugin version
+
+        Returns:
+            bool: True if vulnerable version detected
+        """
+        # Simplified vulnerability database - in production, integrate with WPVulnDB or similar
+        known_vulnerabilities = {
+            "wp-file-manager": {
+                "vulnerable_versions": ["6.0", "6.1", "6.2", "6.3", "6.4"],
+                "severity": "critical",
+                "description": "Remote Code Execution vulnerability",
+            },
+            "social-warfare": {
+                "vulnerable_versions": ["3.5.2", "3.5.1", "3.5.0"],
+                "severity": "critical",
+                "description": "Stored XSS and RCE vulnerability",
+            },
+            "mailpoet": {
+                "vulnerable_versions": ["3.0.0", "3.0.1", "3.0.2"],
+                "severity": "high",
+                "description": "Privilege escalation vulnerability",
+            },
+            "revslider": {
+                "vulnerable_versions": ["5.4.8", "5.4.7", "5.4.6"],
+                "severity": "high",
+                "description": "Arbitrary file upload vulnerability",
+            },
+        }
+
+        plugin_name_clean = plugin_name.lower().replace("_", "-")
+
+        if plugin_name_clean in known_vulnerabilities:
+            vuln_info = known_vulnerabilities[plugin_name_clean]
+            if plugin_version in vuln_info["vulnerable_versions"]:
+                return True
+
+        return False
+
+    def _is_outdated_plugin(self, plugin: Dict) -> bool:
+        """
+        Check if plugin appears to be outdated or unmaintained
+
+        Args:
+            plugin: Plugin information
+
+        Returns:
+            bool: True if plugin appears outdated
+        """
+        plugin_name = plugin.get("name", "").lower()
+
+        # List of plugins known to be abandoned or rarely updated
+        abandoned_plugins = [
+            "wp-super-cache-legacy",
+            "google-analytics-dashboard",
+            "wp-security-scan",
+            "wp-db-backup",
+            "broken-link-checker-legacy",
+            "wordpress-seo-legacy",
+        ]
+
+        # Check if plugin is in abandoned list
+        for abandoned in abandoned_plugins:
+            if abandoned in plugin_name:
+                return True
+
+        # Additional checks could include:
+        # - Last update timestamp (if available)
+        # - WordPress compatibility version
+        # - Download count trends
+
+        return False
+
+    def _is_known_plugin(self, plugin_name: str) -> bool:
+        """
+        Check if plugin is a well-known WordPress repository plugin
+
+        Args:
+            plugin_name: Plugin name
+
+        Returns:
+            bool: True if plugin is well-known/official
+        """
+        # List of popular, well-maintained WordPress plugins
+        known_safe_plugins = [
+            "yoast-seo",
+            "wordpress-seo",
+            "akismet",
+            "jetpack",
+            "contact-form-7",
+            "woocommerce",
+            "elementor",
+            "wordfence",
+            "updraftplus",
+            "wp-rocket",
+            "advanced-custom-fields",
+            "wp-super-cache",
+            "wp-optimize",
+            "sucuri-scanner",
+            "all-in-one-wp-security-and-firewall",
+            "ithemes-security",
+            "w3-total-cache",
+            "duplicate-post",
+            "classic-editor",
+        ]
+
+        plugin_name_clean = plugin_name.lower().replace("_", "-")
+
+        return plugin_name_clean in known_safe_plugins

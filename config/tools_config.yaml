@@ -1,112 +1,232 @@
-# Tool configurations and parameters
-tools:
-  nmap:
-    name: "Network Mapper"
-    binary: "nmap"
-    default_args:
-      - "-sV"  # Version detection
-      - "-sC"  # Default scripts
-      - "-O"   # OS detection
-    profiles:
-      quick:
-        args: ["-F"]  # Fast scan
-      full:
-        args: ["-p-", "-A"]  # All ports, aggressive
-      
-  nikto:
-    name: "Web Vulnerability Scanner"
-    binary: "nikto"
-    default_args:
-      - "-C"
-      - "all"
-      
-  sqlmap:
-    name: "SQL Injection Scanner"
-    binary: "sqlmap"
-    default_args:
-      - "--batch"
-      - "--random-agent"
-      
-  subfinder:
-    name: "Subdomain Finder"
-    binary: "subfinder"
-    default_args:
-      - "-silent"
-      
-  dirb:
-    name: "Directory Scanner"
-    binary: "dirb"
-    wordlist: "/usr/share/wordlists/dirb/common.txt"
+# Enhanced WordPress Scanner Configuration
+# File: config/tools_config.yaml (WordPress section)
+
+wpscan:
+  name: "Enhanced WordPress Scanner"
+  binary: "wpscan"
+  description: "Comprehensive WordPress security scanner with advanced features"
+  category: "cms"
+  priority: 1
+  
+  # Enhanced Configuration Options
+  options:
+    timeout:
+      description: "Request timeout in seconds"
+      default: 60
+      type: "integer"
+    connect_timeout:
+      description: "Connection timeout in seconds" 
+      default: 30
+      type: "integer"
+    max_scan_duration:
+      description: "Maximum scan duration in seconds"
+      default: 300
+      type: "integer"
     
-  # Phase 1.1: CMS-Specific Vulnerability Scanners
-  wpscan:
-    name: "WordPress Security Scanner"
-    binary: "wpscan"
-    description: "WordPress vulnerability scanner"
-    category: "cms"
-    default_args:
-      - "--no-banner"
-      - "--random-user-agent"
-      - "--format"
-      - "json"
-    profiles:
-      quick:
-        description: "Quick WordPress scan"
-        args:
-          - "--enumerate"
-          - "vp"  # Vulnerable plugins only
-      standard:
-        description: "Standard WordPress security scan"
-        args:
-          - "--enumerate"
-          - "p,t,u"  # Plugins, themes, users
-      comprehensive:
-        description: "Comprehensive WordPress assessment"
-        args:
-          - "--enumerate"
-          - "ap,at,u,dbe"  # All plugins, all themes, users, db exports
-          - "--plugins-detection"
-          - "aggressive"
-          - "--plugins-version-detection"
-          - "aggressive"
-    options:
-      api_token:
-        description: "WPScan API token for vulnerability data"
-        required: false
-        env_var: "WPSCAN_API_TOKEN"
-      max_threads:
-        description: "Maximum threads for enumeration"
-        default: 5
-        type: "integer"
-      request_timeout:
-        description: "Request timeout in seconds"
-        default: 60
-        type: "integer"
-      connect_timeout:
-        description: "Connection timeout in seconds" 
-        default: 30
-        type: "integer"
-      max_scan_duration:
-        description: "Maximum scan duration in seconds"
-        default: 300
-        type: "integer"
-    wordlists:
-      users: "/usr/share/wordlists/wpscan/usernames.txt"
-      passwords: "/usr/share/wordlists/rockyou.txt"
-    features:
-      - "WordPress version detection"
-      - "Plugin enumeration and vulnerability detection"
-      - "Theme enumeration and vulnerability detection"
-      - "User enumeration"
-      - "Brute force protection testing"
-      - "WordPress-specific CVE database integration"
-      - "Security configuration analysis"
-      - "XML-RPC testing"
-    requirements:
-      - "wpscan gem installed"
-      - "Ruby >= 2.5"
-      - "Internet connection for vulnerability data"
-    installation:
-      ubuntu: "gem install wpscan"
-      gem: "gem install wpscan"
-      docker: "docker pull wpscanteam/wpscan"
+    # Core WordPress Detection
+    enumerate_plugins:
+      description: "Enumerate WordPress plugins with security analysis"
+      default: true
+      type: "boolean"
+    enumerate_themes:
+      description: "Enumerate WordPress themes with security analysis"
+      default: true
+      type: "boolean"
+    enumerate_users:
+      description: "Enumerate WordPress users"
+      default: true
+      type: "boolean"
+    
+    # Enhanced Security Features (NEW)
+    check_multisite:
+      description: "Analyze WordPress Multisite security configuration"
+      default: true
+      type: "boolean"
+    check_htaccess:
+      description: "Perform enhanced .htaccess security analysis"
+      default: true
+      type: "boolean"
+    detect_security_plugins:
+      description: "Detect and analyze WordPress security plugins"
+      default: true
+      type: "boolean"
+    check_database_security:
+      description: "Check database security configuration"
+      default: true
+      type: "boolean"
+    
+    # Existing Features
+    test_brute_force:
+      description: "Test brute force protection mechanisms"
+      default: true
+      type: "boolean"
+    use_wpscan:
+      description: "Use WPScan for comprehensive vulnerability analysis"
+      default: true
+      type: "boolean"
+    check_xmlrpc:
+      description: "Test XML-RPC endpoint security"
+      default: true
+      type: "boolean"
+    check_config:
+      description: "Analyze security configuration"
+      default: true
+      type: "boolean"
+
+  # Wordlists
+  wordlists:
+    users: "/usr/share/wordlists/wpscan/usernames.txt"
+    passwords: "/usr/share/wordlists/rockyou.txt"
+    plugins: "/usr/share/wordlists/wpscan/plugins.txt"
+    themes: "/usr/share/wordlists/wpscan/themes.txt"
+
+  # Enhanced Features List
+  features:
+    # Core WordPress Security
+    - "WordPress version detection and vulnerability assessment"
+    - "Plugin enumeration with update status and security analysis" # ENHANCED
+    - "Theme enumeration with security analysis and version detection" # ENHANCED
+    - "User enumeration and brute force protection testing"
+    - "WordPress-specific CVE database integration"
+    - "Security configuration analysis"
+    - "XML-RPC security testing"
+    
+    # New Enhanced Features
+    - "WordPress Multisite security testing" # NEW
+    - "Enhanced .htaccess security analysis" # NEW
+    - "WordPress security plugin detection and configuration analysis" # NEW
+    - "Database security configuration testing" # NEW
+    - "File permission and backup file detection" # ENHANCED
+    - "Debug information disclosure detection" # ENHANCED
+    - "Directory browsing and access control testing" # ENHANCED
+    - "Security headers implementation analysis" # NEW
+    - "Cross-site vulnerability testing for Multisite" # NEW
+    - "Plugin/theme update status and vulnerability analysis" # NEW
+
+  # Security Plugin Detection
+  security_plugins:
+    supported:
+      - "Wordfence Security"
+      - "Sucuri Security" 
+      - "iThemes Security"
+      - "Jetpack Security"
+      - "All In One WP Security & Firewall"
+      - "Bulletproof Security"
+      - "WP Security Audit Log"
+      - "Security Headers"
+    
+    detection_methods:
+      - "Plugin directory scanning"
+      - "HTML source code analysis"
+      - "HTTP response header analysis"
+      - "API endpoint detection"
+      - "Configuration file analysis"
+
+  # Multisite Security Testing
+  multisite_features:
+    - "Network admin interface security"
+    - "Subdomain/subfolder structure analysis"
+    - "Cross-site scripting vulnerability testing"
+    - "User role management across sites"
+    - "Site isolation and access control testing"
+    - "Wildcard subdomain security analysis"
+
+  # Database Security Testing
+  database_security:
+    - "Database error disclosure detection"
+    - "Configuration file exposure testing"
+    - "Backup file accessibility checks"
+    - "SQL injection indicator testing"
+    - "Table prefix security analysis"
+    - "Database connection information leakage"
+
+  # .htaccess Security Analysis
+  htaccess_security:
+    - "File accessibility testing"
+    - "Directory protection verification"
+    - "Security headers implementation"
+    - "File access restrictions testing"
+    - "Redirect security analysis"
+    - "Apache configuration security"
+
+  # Requirements
+  requirements:
+    - "wpscan gem installed (gem install wpscan)"
+    - "Ruby >= 2.5"
+    - "Internet connection for vulnerability data"
+    - "WPScan API token (optional, for enhanced vulnerability data)"
+    
+  # Installation Instructions
+  installation:
+    ubuntu: "gem install wpscan"
+    gem: "gem install wpscan"
+    docker: "docker pull wpscanteam/wpscan"
+    api_token: "wpscan --api-token YOUR_TOKEN"
+
+  # Output Formats
+  output_formats:
+    - "JSON (structured vulnerability data)"
+    - "HTML (comprehensive security report)"
+    - "PDF (executive summary report)"
+    - "XML (machine-readable format)"
+    - "CSV (tabular security findings)"
+
+  # Compliance Standards
+  compliance:
+    - "OWASP WordPress Security Guide"
+    - "WordPress Security Best Practices"
+    - "CIS WordPress Security Benchmark"
+    - "PCI DSS Requirements (web application security)"
+
+  # Performance Optimization
+  performance:
+    parallel_scanning: true
+    thread_pool_size: 4
+    request_rate_limit: 10  # requests per second
+    memory_optimization: true
+    cache_enabled: true
+
+  # Security Safeguards
+  safeguards:
+    - "Read-only scanning (no destructive tests)"
+    - "Rate limiting to prevent DoS"
+    - "User-agent randomization"
+    - "Respectful scanning practices"
+    - "No brute force attacks (only protection testing)"
+
+  # Reporting Configuration
+  reporting:
+    severity_levels:
+      - "CRITICAL: Immediate security risks"
+      - "HIGH: Significant security vulnerabilities"
+      - "MEDIUM: Moderate security issues"
+      - "LOW: Minor security improvements"
+      - "INFO: Informational findings"
+    
+    recommendations:
+      include_remediation: true
+      include_references: true
+      include_compliance_mapping: true
+      include_risk_assessment: true
+
+  # API Integration
+  api_integration:
+    wpscan_api:
+      endpoint: "https://wpscan.com/api/v3"
+      rate_limit: "25 requests per day (free)"
+      premium_features: "Unlimited requests, additional vulnerability data"
+    
+    wordpress_org_api:
+      endpoint: "https://api.wordpress.org"
+      features: "Plugin/theme information, update data"
+
+  # Version History
+  version: "2.0.0"
+  last_updated: "2024-12-XX"
+  changelog:
+    - "2.0.0: Added Multisite security testing"
+    - "2.0.0: Enhanced plugin/theme enumeration with security analysis"
+    - "2.0.0: Added comprehensive .htaccess security testing"
+    - "2.0.0: Implemented security plugin detection"
+    - "2.0.0: Added database security configuration testing"
+    - "1.0.0: Initial WordPress scanner implementation"

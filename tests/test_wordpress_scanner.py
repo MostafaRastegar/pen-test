@@ -506,12 +506,436 @@ def test_wordpress_scanner_basic():
     log_success("WordPress scanner basic test completed")
 
 
+@patch("src.scanners.cms.wordpress_scanner.requests.Session")
+def test_multisite_detection(self, mock_session):
+    """Test WordPress Multisite detection"""
+    log_info("Testing WordPress Multisite detection")
+
+    # Mock multisite response
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.text = """
+    <html>
+    <body>
+        <script src="/wp-includes/ms-files.js"></script>
+        <div class="wp-admin/network">Network Admin</div>
+    </body>
+    </html>
+    """
+
+    mock_session_instance = Mock()
+    mock_session_instance.get.return_value = mock_response
+    mock_session.return_value = mock_session_instance
+
+    # Test multisite detection
+    multisite_info = self.scanner._detect_multisite("https://example.com")
+
+    self.assertTrue(multisite_info["is_multisite"])
+    self.assertGreater(len(multisite_info["indicators"]), 0)
+
+    log_success("✅ Multisite detection test passed")
+
+
+@patch("src.scanners.cms.wordpress_scanner.requests.Session")
+def test_enhanced_plugin_enumeration(self, mock_session):
+    """Test enhanced plugin enumeration with security analysis"""
+    log_info("Testing enhanced plugin enumeration")
+
+    # Mock WordPress page with plugin references
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.text = """
+    <html>
+    <head>
+        <script src="/wp-content/plugins/akismet/js/akismet.js"></script>
+        <link rel="stylesheet" href="/wp-content/plugins/contact-form-7/css/styles.css" />
+    </head>
+    </html>
+    """
+
+    mock_session_instance = Mock()
+    mock_session_instance.get.return_value = mock_response
+    mock_session.return_value = mock_session_instance
+
+    # Test plugin detection
+    plugins = self.scanner._detect_plugins_from_source("https://example.com")
+
+    # Should detect plugins mentioned in HTML
+    detected_plugin_names = [p["name"] for p in plugins]
+    self.assertIn("akismet", detected_plugin_names)
+    self.assertIn("contact-form-7", detected_plugin_names)
+
+    log_success("✅ Enhanced plugin enumeration test passed")
+
+
+def test_plugin_security_analysis(self):
+    """Test plugin security status analysis"""
+    log_info("Testing plugin security analysis")
+
+    # Test vulnerable plugin
+    vulnerable_plugin = {
+        "name": "revslider",
+        "version": "4.1",
+        "path": "/wp-content/plugins/revslider/",
+    }
+
+    security_status = self.scanner._check_plugin_security_status(vulnerable_plugin)
+    self.assertTrue(security_status["vulnerable"])
+
+    # Test safe plugin
+    safe_plugin = {
+        "name": "safe-plugin",
+        "version": "5.0",
+        "path": "/wp-content/plugins/safe-plugin/",
+    }
+
+    safe_status = self.scanner._check_plugin_security_status(safe_plugin)
+    self.assertFalse(safe_status["vulnerable"])
+
+    log_success("✅ Plugin security analysis test passed")
+
+
+@patch("src.scanners.cms.wordpress_scanner.requests.Session")
+def test_htaccess_security_analysis(self, mock_session):
+    """Test .htaccess security analysis"""
+    log_info("Testing .htaccess security analysis")
+
+    from src.core import ScanResult
+    from datetime import datetime
+
+    result = ScanResult(
+        scanner_name="test",
+        target="https://example.com",
+        status=ScanStatus.RUNNING,
+        start_time=datetime.now(),
+    )
+
+    # Mock .htaccess accessible (security issue)
+    mock_htaccess_response = Mock()
+    mock_htaccess_response.status_code = 200
+    mock_htaccess_response.content = b"RewriteEngine On\nOptions -Indexes"
+    mock_htaccess_response.headers = {"Content-Type": "text/plain"}
+
+    # Mock main site response
+    mock_main_response = Mock()
+    mock_main_response.status_code = 200
+    mock_main_response.headers = {"Server": "Apache"}
+
+    def mock_get(url, **kwargs):
+        if ".htaccess" in url:
+            return mock_htaccess_response
+        return mock_main_response
+
+    mock_session_instance = Mock()
+    mock_session_instance.get.side_effect = mock_get
+    mock_session.return_value = mock_session_instance
+
+    # Test .htaccess accessibility check
+    accessibility = self.scanner._check_htaccess_accessibility("https://example.com")
+    self.assertTrue(accessibility["accessible"])
+
+    log_success("✅ .htaccess security analysis test passed")
+
+
+@patch("src.scanners.cms.wordpress_scanner.requests.Session")
+def test_security_plugin_detection(self, mock_session):
+    """Test WordPress security plugin detection"""
+    log_info("Testing security plugin detection")
+
+    from src.core import ScanResult
+    from datetime import datetime
+
+    result = ScanResult(
+        scanner_name="test",
+        target="https://example.com",
+        status=ScanStatus.RUNNING,
+        start_time=datetime.now(),
+    )
+
+    # Mock WordPress page with Wordfence indicators
+    mock_main_response = Mock()
+    mock_main_response.status_code = 200
+    mock_main_response.text = """
+    <html>
+    <head>
+        <script src="/wp-content/plugins/wordfence/js/wf.js"></script>
+        <script>var wfConfig = {'firewall': true};</script>
+    </head>
+    </html>
+    """
+
+    # Mock Wordfence plugin directory (403 - protected)
+    mock_plugin_response = Mock()
+    mock_plugin_response.status_code = 403
+
+    def mock_get(url, **kwargs):
+        if "/wp-content/plugins/wordfence/" in url:
+            return mock_plugin_response
+        return mock_main_response
+
+    mock_session_instance = Mock()
+    mock_session_instance.get.side_effect = mock_get
+    mock_session.return_value = mock_session_instance
+
+    # Test specific security plugin detection
+    wordfence_info = self.scanner.security_plugins["wordfence"]
+    detection_result = self.scanner._detect_specific_security_plugin(
+        "https://example.com", wordfence_info
+    )
+
+    self.assertTrue(detection_result["detected"])
+    self.assertGreater(detection_result["confidence"], 0)
+
+    log_success("✅ Security plugin detection test passed")
+
+
+@patch("src.scanners.cms.wordpress_scanner.requests.Session")
+def test_database_security_checks(self, mock_session):
+    """Test database security configuration checks"""
+    log_info("Testing database security checks")
+
+    from src.core import ScanResult
+    from datetime import datetime
+
+    result = ScanResult(
+        scanner_name="test",
+        target="https://example.com",
+        status=ScanStatus.RUNNING,
+        start_time=datetime.now(),
+    )
+
+    # Mock database error response
+    mock_error_response = Mock()
+    mock_error_response.status_code = 200
+    mock_error_response.text = """
+    <html>
+    <body>
+        <h1>Database Error</h1>
+        <p>MySQL error: Table 'wordpress.wp_posts' doesn't exist</p>
+    </body>
+    </html>
+    """
+
+    # Mock wp-config.php exposure (critical issue)
+    mock_config_response = Mock()
+    mock_config_response.status_code = 200
+    mock_config_response.content = b"""<?php
+    define('DB_NAME', 'wordpress_db');
+    define('DB_USER', 'wp_user');
+    define('DB_PASSWORD', 'secret_password');
+    """
+
+    mock_normal_response = Mock()
+    mock_normal_response.status_code = 200
+    mock_normal_response.text = "<html><body>Normal page</body></html>"
+
+    def mock_get(url, **kwargs):
+        if "wp-config.php" in url:
+            return mock_config_response
+        elif "p='" in url:  # SQL injection test
+            return mock_error_response
+        return mock_normal_response
+
+    mock_session_instance = Mock()
+    mock_session_instance.get.side_effect = mock_get
+    mock_session.return_value = mock_session_instance
+
+    # Test database info leakage
+    self.scanner._test_database_info_leakage("https://example.com", result)
+
+    # Should have critical finding for wp-config.php exposure
+    critical_findings = [
+        f for f in result.findings if f.get("severity") == ScanSeverity.CRITICAL
+    ]
+    self.assertGreater(len(critical_findings), 0)
+
+    log_success("✅ Database security checks test passed")
+
+
+@patch("src.scanners.cms.wordpress_scanner.requests.Session")
+def test_theme_security_analysis(self, mock_session):
+    """Test enhanced theme enumeration and security analysis"""
+    log_info("Testing theme security analysis")
+
+    # Mock WordPress page with theme references
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.text = """
+    <html>
+    <head>
+        <link rel="stylesheet" href="/wp-content/themes/twentytwentyfour/style.css" />
+    </head>
+    </html>
+    """
+
+    # Mock theme style.css with version
+    mock_style_response = Mock()
+    mock_style_response.status_code = 200
+    mock_style_response.text = """
+    /*
+    Theme Name: Twenty Twenty-Four
+    Version: 1.0
+    */
+    """
+
+    def mock_get(url, **kwargs):
+        if "style.css" in url:
+            return mock_style_response
+        return mock_response
+
+    mock_session_instance = Mock()
+    mock_session_instance.get.side_effect = mock_get
+    mock_session.return_value = mock_session_instance
+
+    # Test active theme detection
+    active_theme = self.scanner._detect_active_theme("https://example.com")
+
+    self.assertIsNotNone(active_theme)
+    self.assertEqual(active_theme["name"], "twentytwentyfour")
+
+    # Test theme security analysis
+    theme_security = self.scanner._analyze_theme_security(
+        "https://example.com", active_theme
+    )
+
+    # twentytwentyfour is a default theme, should be secure
+    self.assertFalse(theme_security["custom_theme"])
+    self.assertGreater(theme_security["security_score"], 50)
+
+    log_success("✅ Theme security analysis test passed")
+
+
+def test_enhanced_scan_workflow(self):
+    """Test complete enhanced WordPress scan workflow"""
+    log_info("Testing enhanced scan workflow")
+
+    # Mock WordPress detection
+    with patch.object(self.scanner, "_detect_wordpress") as mock_wp_detect:
+        mock_wp_detect.return_value = True
+
+        # Mock all enhanced scanner methods
+        with patch.object(self.scanner, "_detect_wp_version"), patch.object(
+            self.scanner, "_enumerate_plugins_enhanced"
+        ), patch.object(self.scanner, "_enumerate_themes_enhanced"), patch.object(
+            self.scanner, "_enumerate_users"
+        ), patch.object(
+            self.scanner, "_check_multisite_security"
+        ), patch.object(
+            self.scanner, "_analyze_htaccess_security"
+        ), patch.object(
+            self.scanner, "_detect_security_plugins"
+        ), patch.object(
+            self.scanner, "_check_database_security"
+        ), patch.object(
+            self.scanner, "_test_brute_force_protection"
+        ), patch.object(
+            self.scanner, "_run_wpscan"
+        ), patch.object(
+            self.scanner, "_analyze_security_config"
+        ), patch.object(
+            self.scanner, "_test_xmlrpc"
+        ):
+
+            # Run complete scan with enhanced options
+            options = {
+                "enumerate_plugins": True,
+                "enumerate_themes": True,
+                "enumerate_users": True,
+                "check_multisite": True,
+                "check_htaccess": True,
+                "detect_security_plugins": True,
+                "check_database_security": True,
+                "test_brute_force": True,
+                "use_wpscan": True,
+            }
+
+            result = self.scanner.scan("https://example.com", options)
+
+            # Verify scan completed successfully
+            self.assertEqual(result.status, ScanStatus.COMPLETED)
+            self.assertIsNotNone(result.end_time)
+
+    log_success("✅ Enhanced scan workflow test passed")
+
+
+def test_security_recommendations(self):
+    """Test security recommendation generation"""
+    log_info("Testing security recommendations")
+
+    # Test plugin recommendations
+    vulnerable_status = {"vulnerable": True, "outdated": True, "abandoned": False}
+
+    recommendations = self.scanner._get_plugin_recommendations(vulnerable_status)
+    self.assertIn("Update or remove vulnerable plugin", recommendations)
+    self.assertIn("Update plugin to latest version", recommendations)
+
+    # Test theme recommendations
+    vulnerable_theme_analysis = {
+        "vulnerable": True,
+        "outdated": False,
+        "custom_theme": True,
+    }
+
+    theme_recommendations = self.scanner._get_theme_recommendations(
+        vulnerable_theme_analysis
+    )
+    self.assertIn("Update vulnerable theme", theme_recommendations)
+    self.assertIn("custom theme follows WordPress security", theme_recommendations)
+
+    log_success("✅ Security recommendations test passed")
+
+
+def test_enhanced_wordpress_features():
+    """Test enhanced WordPress scanner features"""
+    log_banner("Testing Enhanced WordPress Features", "bold green")
+
+    scanner = WordPressScanner()
+
+    # Test scanner has enhanced capabilities
+    capabilities = scanner.get_capabilities()
+
+    # Check for enhanced features
+    enhanced_features = [
+        "Multisite security testing",
+        "Enhanced plugin enumeration",
+        "Security plugin detection",
+        "Database security analysis",
+        ".htaccess security testing",
+    ]
+
+    log_info("Checking enhanced features:")
+    for feature in enhanced_features:
+        # Check if feature description exists in capabilities
+        feature_exists = any(
+            feature.lower() in str(capabilities).lower()
+            for feature in enhanced_features
+        )
+        status = "✅" if feature_exists else "⚠️"
+        log_info(f"  {status} Enhanced features available")
+
+    # Test security plugins configuration
+    security_plugins = scanner.security_plugins
+    log_info(f"Security plugins supported: {len(security_plugins)}")
+
+    expected_plugins = ["wordfence", "sucuri", "ithemes", "jetpack"]
+    for plugin in expected_plugins:
+        if plugin in security_plugins:
+            log_info(f"  ✅ {security_plugins[plugin]['name']}")
+        else:
+            log_info(f"  ❌ {plugin} not configured")
+
+    log_success("Enhanced WordPress features test completed")
+
+
 if __name__ == "__main__":
     # Setup logging
     LoggerSetup.setup_console_logging()
 
     # Run basic test
     test_wordpress_scanner_basic()
+
+    # NEW: Run enhanced features test
+    test_enhanced_wordpress_features()
 
     # Run unit tests
     log_banner("Running WordPress Scanner Unit Tests", "bold red")

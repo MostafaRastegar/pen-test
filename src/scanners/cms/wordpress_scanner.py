@@ -55,6 +55,39 @@ class WordPressScanner(ScannerBase):
             "xmlrpc": "/xmlrpc.php",
             "readme": "/readme.html",
             "license": "/license.txt",
+            "generator": 'name="generator" content="WordPress',
+            "wp_json": "/wp-json/",
+        }
+
+        self.security_plugins = {
+            "wordfence": {
+                "paths": [
+                    "/wp-content/plugins/wordfence/",
+                    "/wp-content/mu-plugins/wordfence/",
+                ],
+                "indicators": ["wordfence", "wfConfig"],
+                "name": "Wordfence Security",
+            },
+            "sucuri": {
+                "paths": ["/wp-content/plugins/sucuri-scanner/"],
+                "indicators": ["sucuri", "sitecheck"],
+                "name": "Sucuri Security",
+            },
+            "ithemes": {
+                "paths": ["/wp-content/plugins/better-wp-security/"],
+                "indicators": ["ithemes", "better-wp-security"],
+                "name": "iThemes Security",
+            },
+            "jetpack": {
+                "paths": ["/wp-content/plugins/jetpack/"],
+                "indicators": ["jetpack", "automattic"],
+                "name": "Jetpack Security",
+            },
+            "all_in_one": {
+                "paths": ["/wp-content/plugins/all-in-one-wp-security-and-firewall/"],
+                "indicators": ["aiowps", "all-in-one-wp-security"],
+                "name": "All In One WP Security",
+            },
         }
 
         # Common WordPress paths for enumeration
@@ -1800,3 +1833,672 @@ class WordPressScanner(ScannerBase):
                 )
         except:
             pass
+
+    # NEW METHOD 1: WordPress Multisite Security Testing
+    def _check_multisite_security(self, target_url: str, result: ScanResult) -> None:
+        """Analyze WordPress Multisite security configuration"""
+        try:
+            log_info("Checking WordPress Multisite security configuration")
+
+            # Step 1: Detect if multisite is enabled
+            multisite_detected = self._detect_multisite(target_url)
+
+            if not multisite_detected["is_multisite"]:
+                log_info("WordPress Multisite not detected")
+                return
+
+            result.add_finding(
+                title="WordPress Multisite Detected",
+                description=f"WordPress Multisite configuration detected: {multisite_detected['type']}",
+                severity=ScanSeverity.INFO,
+                technical_details=multisite_detected,
+                recommendation="Ensure multisite-specific security measures are implemented",
+            )
+
+            # Step 2: Check Network Admin Access
+            self._check_network_admin_security(target_url, result, multisite_detected)
+
+            log_success("Multisite security analysis completed")
+
+        except Exception as e:
+            log_error(f"Multisite security check failed: {e}")
+            result.add_finding(
+                title="Multisite Security Check Error",
+                description=f"Failed to analyze multisite security: {str(e)}",
+                severity=ScanSeverity.LOW,
+                recommendation="Manual multisite security review recommended",
+            )
+
+    def _detect_multisite(self, target_url: str) -> Dict[str, Any]:
+        """Detect WordPress Multisite configuration"""
+        multisite_info = {
+            "is_multisite": False,
+            "type": "single",
+            "network_admin_detected": False,
+            "subdomain_install": False,
+            "subfolder_install": False,
+            "indicators": [],
+        }
+
+        try:
+            # Check for network admin
+            network_admin_url = urljoin(target_url, "/wp-admin/network/")
+            response = self.session.get(network_admin_url, timeout=10)
+            if response.status_code != 404:
+                multisite_info["network_admin_detected"] = True
+                multisite_info["indicators"].append("network_admin_accessible")
+
+            # Check main site response for multisite indicators
+            response = self.session.get(target_url, timeout=10)
+            if response.status_code == 200:
+                content = response.text.lower()
+
+                # Look for multisite indicators in HTML
+                multisite_indicators = [
+                    "wp-admin/network",
+                    "wp-includes/ms-",
+                    "multisite",
+                    "network_site_url",
+                    "switch_to_blog",
+                ]
+
+                for indicator in multisite_indicators:
+                    if indicator in content:
+                        multisite_info["indicators"].append(indicator)
+
+            # If we have indicators, mark as multisite
+            if (
+                len(multisite_info["indicators"]) > 0
+                or multisite_info["network_admin_detected"]
+            ):
+                multisite_info["is_multisite"] = True
+                multisite_info["type"] = "multisite"
+
+        except Exception as e:
+            log_error(f"Multisite detection failed: {e}")
+
+        return multisite_info
+
+    def _check_network_admin_security(
+        self, target_url: str, result: ScanResult, multisite_info: Dict[str, Any]
+    ) -> None:
+        """Check Network Admin security configuration"""
+        try:
+            network_admin_url = urljoin(target_url, "/wp-admin/network/")
+            response = self.session.get(network_admin_url, timeout=10)
+
+            if response.status_code == 200:
+                result.add_finding(
+                    title="Network Admin Interface Accessible",
+                    description="WordPress Network Admin interface is accessible without authentication",
+                    severity=ScanSeverity.HIGH,
+                    recommendation="Restrict Network Admin access to specific IP addresses or use additional authentication",
+                )
+            elif response.status_code == 302:
+                # Good - redirecting to login
+                result.add_finding(
+                    title="Network Admin Properly Protected",
+                    description="Network Admin interface properly redirects to authentication",
+                    severity=ScanSeverity.LOW,
+                    recommendation="Ensure strong authentication is enforced for Super Admin accounts",
+                )
+
+        except Exception as e:
+            log_error(f"Network admin security check failed: {e}")
+
+    # NEW METHOD 2: Enhanced Plugin Enumeration
+    def _enumerate_plugins_enhanced(
+        self, target_url: str, result: ScanResult, options: Dict[str, Any]
+    ) -> None:
+        """Enhanced plugin enumeration with security analysis"""
+        try:
+            log_info("Starting enhanced plugin enumeration with update status")
+
+            # Get installed plugins
+            plugins_found = self._detect_plugins_from_source(target_url)
+
+            for plugin in plugins_found:
+                # Check plugin security status
+                security_status = self._check_plugin_security_status(plugin)
+
+                severity = ScanSeverity.INFO
+                if security_status["outdated"]:
+                    severity = ScanSeverity.MEDIUM
+                if security_status["vulnerable"]:
+                    severity = ScanSeverity.HIGH
+                if security_status["abandoned"]:
+                    severity = ScanSeverity.HIGH
+
+                result.add_finding(
+                    title=f"WordPress Plugin: {plugin['name']}",
+                    description=f"Plugin detected - Version: {plugin.get('version', 'Unknown')}",
+                    severity=severity,
+                    technical_details={
+                        "plugin_name": plugin["name"],
+                        "version": plugin.get("version", "Unknown"),
+                        "path": plugin["path"],
+                        "security_status": security_status,
+                    },
+                    recommendation=self._get_plugin_recommendations(security_status),
+                )
+
+            log_success(
+                f"Enhanced plugin enumeration completed. Found {len(plugins_found)} plugins"
+            )
+
+        except Exception as e:
+            log_error(f"Enhanced plugin enumeration failed: {e}")
+
+    def _detect_plugins_from_source(self, target_url: str) -> List[Dict[str, Any]]:
+        """Detect plugins from WordPress source code"""
+        plugins = []
+
+        try:
+            response = self.session.get(target_url, timeout=10)
+            if response.status_code == 200:
+                content = response.text
+
+                # Look for plugin references in HTML source
+                plugin_patterns = [
+                    r'/wp-content/plugins/([^/\'"]+)',
+                    r'wp-content/plugins/([^/\'"]+)',
+                ]
+
+                for pattern in plugin_patterns:
+                    matches = re.findall(pattern, content)
+                    for match in matches:
+                        if match not in [p["name"] for p in plugins]:
+                            plugin_info = {
+                                "name": match,
+                                "path": f"/wp-content/plugins/{match}/",
+                                "version": self._detect_plugin_version(
+                                    target_url, match
+                                ),
+                            }
+                            plugins.append(plugin_info)
+
+        except Exception as e:
+            log_error(f"Plugin detection from source failed: {e}")
+
+        return plugins
+
+    def _detect_plugin_version(self, target_url: str, plugin_name: str) -> str:
+        """Detect specific plugin version"""
+        try:
+            # Try to read plugin main file or readme
+            plugin_paths = [
+                f"/wp-content/plugins/{plugin_name}/{plugin_name}.php",
+                f"/wp-content/plugins/{plugin_name}/readme.txt",
+                f"/wp-content/plugins/{plugin_name}/README.txt",
+            ]
+
+            for path in plugin_paths:
+                plugin_url = urljoin(target_url, path)
+                response = self.session.get(plugin_url, timeout=5)
+
+                if response.status_code == 200:
+                    content = response.text
+                    version_patterns = [
+                        r"Version:\s*([0-9.]+)",
+                        r"Stable tag:\s*([0-9.]+)",
+                        r"@version\s*([0-9.]+)",
+                    ]
+
+                    for pattern in version_patterns:
+                        match = re.search(pattern, content, re.IGNORECASE)
+                        if match:
+                            return match.group(1)
+
+        except:
+            pass
+
+        return "Unknown"
+
+    def _check_plugin_security_status(self, plugin: Dict[str, Any]) -> Dict[str, Any]:
+        """Check plugin security status including updates and vulnerabilities"""
+        status = {
+            "outdated": False,
+            "vulnerable": False,
+            "abandoned": False,
+            "last_updated": "Unknown",
+            "security_score": 0,
+        }
+
+        try:
+            plugin_name = plugin["name"]
+            version = plugin.get("version", "Unknown")
+
+            # Check for known vulnerable plugins (simplified list)
+            vulnerable_plugins = {
+                "timthumb": {
+                    "all_versions": True,
+                    "reason": "Known vulnerable image resizer",
+                },
+                "revslider": {
+                    "vulnerable_versions": ["4.0", "4.1", "4.2"],
+                    "reason": "Multiple vulnerabilities",
+                },
+                "contact-form-7": {
+                    "vulnerable_versions": ["3.0", "3.1"],
+                    "reason": "XSS vulnerabilities",
+                },
+            }
+
+            if plugin_name in vulnerable_plugins:
+                vuln_info = vulnerable_plugins[plugin_name]
+                if vuln_info.get("all_versions") or version in vuln_info.get(
+                    "vulnerable_versions", []
+                ):
+                    status["vulnerable"] = True
+                    status["security_score"] = 20
+
+            # Check for abandoned plugins (simplified check)
+            abandoned_indicators = ["timthumb", "old-", "legacy-", "deprecated-"]
+            if any(
+                indicator in plugin_name.lower() for indicator in abandoned_indicators
+            ):
+                status["abandoned"] = True
+                status["security_score"] = 30
+
+        except Exception as e:
+            log_error(f"Plugin security status check failed: {e}")
+
+        return status
+
+    def _get_plugin_recommendations(self, security_status: Dict[str, Any]) -> str:
+        """Generate plugin security recommendations"""
+        recommendations = []
+
+        if security_status["vulnerable"]:
+            recommendations.append("Update or remove vulnerable plugin immediately")
+
+        if security_status["abandoned"]:
+            recommendations.append(
+                "Replace abandoned plugin with actively maintained alternative"
+            )
+
+        if security_status["outdated"]:
+            recommendations.append("Update plugin to latest version")
+
+        if not recommendations:
+            recommendations.append(
+                "Keep plugin updated and monitor for security advisories"
+            )
+
+        return "; ".join(recommendations)
+
+    # NEW METHOD 3: Enhanced Theme Enumeration
+    def _enumerate_themes_enhanced(
+        self, target_url: str, result: ScanResult, options: Dict[str, Any]
+    ) -> None:
+        """Enhanced theme enumeration with security analysis"""
+        try:
+            log_info("Starting enhanced theme enumeration")
+
+            # Detect active theme
+            active_theme = self._detect_active_theme(target_url)
+            if active_theme:
+                theme_security = self._analyze_theme_security(target_url, active_theme)
+
+                severity = ScanSeverity.INFO
+                if theme_security["outdated"]:
+                    severity = ScanSeverity.MEDIUM
+                if theme_security["vulnerable"]:
+                    severity = ScanSeverity.HIGH
+
+                result.add_finding(
+                    title=f"Active WordPress Theme: {active_theme['name']}",
+                    description=f"Active theme detected - Version: {active_theme.get('version', 'Unknown')}",
+                    severity=severity,
+                    technical_details={
+                        "theme_name": active_theme["name"],
+                        "version": active_theme.get("version", "Unknown"),
+                        "path": active_theme["path"],
+                        "security_analysis": theme_security,
+                    },
+                    recommendation=self._get_theme_recommendations(theme_security),
+                )
+
+            log_success("Enhanced theme enumeration completed")
+
+        except Exception as e:
+            log_error(f"Enhanced theme enumeration failed: {e}")
+
+    def _detect_active_theme(self, target_url: str) -> Optional[Dict[str, Any]]:
+        """Detect active WordPress theme"""
+        try:
+            response = self.session.get(target_url, timeout=10)
+            if response.status_code == 200:
+                content = response.text
+
+                # Look for theme references
+                theme_patterns = [
+                    r'/wp-content/themes/([^/\'"]+)',
+                    r'wp-content/themes/([^/\'"]+)',
+                ]
+
+                for pattern in theme_patterns:
+                    matches = re.findall(pattern, content)
+                    if matches:
+                        theme_name = matches[0]  # First match is likely active theme
+                        return {
+                            "name": theme_name,
+                            "path": f"/wp-content/themes/{theme_name}/",
+                            "version": self._detect_theme_version(
+                                target_url, theme_name
+                            ),
+                        }
+
+        except Exception as e:
+            log_error(f"Active theme detection failed: {e}")
+
+        return None
+
+    def _detect_theme_version(self, target_url: str, theme_name: str) -> str:
+        """Detect theme version"""
+        try:
+            # Try to read theme style.css file
+            style_url = urljoin(
+                target_url, f"/wp-content/themes/{theme_name}/style.css"
+            )
+            response = self.session.get(style_url, timeout=5)
+
+            if response.status_code == 200:
+                content = response.text
+                version_match = re.search(
+                    r"Version:\s*([0-9.]+)", content, re.IGNORECASE
+                )
+                if version_match:
+                    return version_match.group(1)
+
+        except:
+            pass
+
+        return "Unknown"
+
+    def _analyze_theme_security(
+        self, target_url: str, theme: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Analyze theme security"""
+        security_analysis = {
+            "outdated": False,
+            "vulnerable": False,
+            "custom_theme": False,
+            "security_score": 80,
+        }
+
+        try:
+            theme_name = theme["name"]
+
+            # Check if it's a default WordPress theme
+            default_themes = [
+                "twentytwentyfour",
+                "twentytwentythree",
+                "twentytwentytwo",
+                "twentytwentyone",
+            ]
+            if theme_name not in default_themes:
+                security_analysis["custom_theme"] = True
+                security_analysis["security_score"] -= 10
+
+        except Exception as e:
+            log_error(f"Theme security analysis failed: {e}")
+
+        return security_analysis
+
+    def _get_theme_recommendations(self, security_analysis: Dict[str, Any]) -> str:
+        """Generate theme security recommendations"""
+        recommendations = []
+
+        if security_analysis["vulnerable"]:
+            recommendations.append("Update vulnerable theme immediately")
+
+        if security_analysis["outdated"]:
+            recommendations.append("Update theme to latest version")
+
+        if security_analysis["custom_theme"]:
+            recommendations.append(
+                "Ensure custom theme follows WordPress security best practices"
+            )
+
+        if not recommendations:
+            recommendations.append(
+                "Keep theme updated and monitor for security updates"
+            )
+
+        return "; ".join(recommendations)
+
+    # NEW METHOD 4: Security Plugin Detection
+    def _detect_security_plugins(self, target_url: str, result: ScanResult) -> None:
+        """Detect WordPress security plugins"""
+        try:
+            log_info("Detecting WordPress security plugins")
+
+            detected_plugins = []
+
+            for plugin_key, plugin_info in self.security_plugins.items():
+                detection_result = self._detect_specific_security_plugin(
+                    target_url, plugin_info
+                )
+
+                if detection_result["detected"]:
+                    detected_plugins.append(
+                        {
+                            "name": plugin_info["name"],
+                            "key": plugin_key,
+                            "confidence": detection_result["confidence"],
+                            "indicators": detection_result["indicators"],
+                            "version": detection_result.get("version", "Unknown"),
+                        }
+                    )
+
+            if detected_plugins:
+                result.add_finding(
+                    title="WordPress Security Plugins Detected",
+                    description=f"Found {len(detected_plugins)} security plugins installed",
+                    severity=ScanSeverity.INFO,
+                    technical_details={"detected_plugins": detected_plugins},
+                    recommendation="Ensure security plugins are properly configured and updated",
+                )
+            else:
+                result.add_finding(
+                    title="No Security Plugins Detected",
+                    description="No WordPress security plugins were detected",
+                    severity=ScanSeverity.MEDIUM,
+                    recommendation="Consider installing a reputable WordPress security plugin (Wordfence, Sucuri, etc.)",
+                )
+
+            log_success(
+                f"Security plugin detection completed. Found {len(detected_plugins)} plugins"
+            )
+
+        except Exception as e:
+            log_error(f"Security plugin detection failed: {e}")
+
+    def _detect_specific_security_plugin(
+        self, target_url: str, plugin_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Detect specific security plugin"""
+        detection_result = {
+            "detected": False,
+            "confidence": 0,
+            "indicators": [],
+            "version": "Unknown",
+        }
+
+        try:
+            # Check plugin paths
+            for path in plugin_info["paths"]:
+                plugin_url = urljoin(target_url, path)
+                response = self.session.get(plugin_url, timeout=5)
+
+                if response.status_code in [
+                    200,
+                    403,
+                ]:  # 403 might indicate protected plugin directory
+                    detection_result["detected"] = True
+                    detection_result["confidence"] += 30
+                    detection_result["indicators"].append(f"Path accessible: {path}")
+
+            # Check main site for plugin indicators
+            response = self.session.get(target_url, timeout=10)
+            if response.status_code == 200:
+                content = response.text.lower()
+
+                for indicator in plugin_info["indicators"]:
+                    if indicator.lower() in content:
+                        detection_result["detected"] = True
+                        detection_result["confidence"] += 20
+                        detection_result["indicators"].append(
+                            f"Indicator found: {indicator}"
+                        )
+
+        except Exception as e:
+            log_error(f"Specific security plugin detection failed: {e}")
+
+        return detection_result
+
+    # NEW METHOD 5: .htaccess Security Analysis
+    def _analyze_htaccess_security(self, target_url: str, result: ScanResult) -> None:
+        """Analyze .htaccess security configuration"""
+        try:
+            log_info("Analyzing .htaccess security configuration")
+
+            # Check .htaccess accessibility
+            htaccess_accessible = self._check_htaccess_accessibility(target_url)
+
+            if htaccess_accessible["accessible"]:
+                result.add_finding(
+                    title=".htaccess File Accessible",
+                    description=".htaccess configuration file is directly accessible",
+                    severity=ScanSeverity.HIGH,
+                    technical_details=htaccess_accessible,
+                    recommendation="Block direct access to .htaccess files via server configuration",
+                )
+
+            log_success(".htaccess security analysis completed")
+
+        except Exception as e:
+            log_error(f".htaccess security analysis failed: {e}")
+
+    def _check_htaccess_accessibility(self, target_url: str) -> Dict[str, Any]:
+        """Check if .htaccess file is directly accessible"""
+        accessibility_info = {
+            "accessible": False,
+            "status_code": None,
+            "content_length": 0,
+            "content_type": None,
+        }
+
+        try:
+            htaccess_url = urljoin(target_url, "/.htaccess")
+            response = self.session.get(htaccess_url, timeout=10)
+
+            accessibility_info["status_code"] = response.status_code
+            accessibility_info["content_length"] = len(response.content)
+            accessibility_info["content_type"] = response.headers.get(
+                "Content-Type", ""
+            )
+
+            # .htaccess should return 403 Forbidden or 404 Not Found
+            if response.status_code == 200:
+                accessibility_info["accessible"] = True
+
+        except Exception as e:
+            log_error(f".htaccess accessibility check failed: {e}")
+
+        return accessibility_info
+
+    # NEW METHOD 6: Database Security Testing
+    def _check_database_security(self, target_url: str, result: ScanResult) -> None:
+        """Check WordPress database security configuration"""
+        try:
+            log_info("Checking WordPress database security configuration")
+
+            # Check for database errors disclosure
+            self._check_database_error_disclosure(target_url, result)
+
+            # Test database connection information leakage
+            self._test_database_info_leakage(target_url, result)
+
+            log_success("Database security analysis completed")
+
+        except Exception as e:
+            log_error(f"Database security check failed: {e}")
+
+    def _check_database_error_disclosure(
+        self, target_url: str, result: ScanResult
+    ) -> None:
+        """Check for database error disclosure"""
+        try:
+            # Test URLs that might trigger database errors
+            error_test_urls = [
+                f"{target_url}/?p='",
+                f"{target_url}/?cat='",
+                f"{target_url}/?s='",
+            ]
+
+            for test_url in error_test_urls:
+                response = self.session.get(test_url, timeout=10)
+
+                if response.status_code == 200:
+                    content = response.text.lower()
+                    error_patterns = [
+                        "mysql",
+                        "database error",
+                        "sql syntax",
+                        "mysqli_",
+                        "postgresql",
+                        "ora-",
+                        "sqlstate",
+                    ]
+
+                    for pattern in error_patterns:
+                        if pattern in content:
+                            result.add_finding(
+                                title="Database Error Disclosure",
+                                description=f"Database error information disclosed at: {test_url}",
+                                severity=ScanSeverity.MEDIUM,
+                                technical_details={
+                                    "test_url": test_url,
+                                    "pattern": pattern,
+                                },
+                                recommendation="Configure WordPress to hide database errors in production",
+                            )
+                            break
+
+        except Exception as e:
+            log_error(f"Database error disclosure check failed: {e}")
+
+    def _test_database_info_leakage(self, target_url: str, result: ScanResult) -> None:
+        """Test for database connection information leakage"""
+        try:
+            # Check wp-config.php accessibility (should be blocked)
+            config_url = urljoin(target_url, "/wp-config.php")
+            response = self.session.get(config_url, timeout=10)
+
+            if response.status_code == 200 and len(response.content) > 0:
+                content = response.text
+                sensitive_patterns = [
+                    "DB_NAME",
+                    "DB_USER",
+                    "DB_PASSWORD",
+                    "DB_HOST",
+                    "database_name_here",
+                    "username_here",
+                    "password_here",
+                ]
+
+                for pattern in sensitive_patterns:
+                    if pattern in content:
+                        result.add_finding(
+                            title="Database Configuration Exposed",
+                            description="WordPress configuration file with database credentials is accessible",
+                            severity=ScanSeverity.CRITICAL,
+                            technical_details={"url": config_url, "pattern": pattern},
+                            recommendation="Immediately block access to wp-config.php via server configuration",
+                        )
+                        break
+
+        except Exception as e:
+            log_error(f"Database info leakage test failed: {e}")

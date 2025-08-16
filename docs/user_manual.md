@@ -36,6 +36,7 @@ python main.py port scanme.nmap.org --ports 22,80,443
 python main.py web https://scanme.nmap.org --use-nikto
 python main.py dns scanme.nmap.org --subdomain-enum
 python main.py directory https://scanme.nmap.org --wordlist
+python main.py wordpress https://scanme.nmap.org --all-reports
 ```
 
 ---

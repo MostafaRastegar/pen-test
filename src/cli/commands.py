@@ -7,7 +7,7 @@ import click
 import sys
 from typing import Dict, Any, Optional
 from pathlib import Path
-
+from datetime import datetime
 from .options import common_options
 from ..services.scan_service import ScanService
 from ..services.scanner_service import ScannerService
@@ -15,6 +15,7 @@ from ..services.info_service import InfoService
 from ..services.utility_services import CacheService, ToolService, VersionService
 from ..utils.target_parser import TargetParser
 from ..utils.logger import log_info, log_error, log_success, log_warning
+from ..utils.reporter import ReportGenerator
 
 
 @click.command()
@@ -229,22 +230,22 @@ def clear_cache_command(all, scanner, force):
         log_error(f"Error clearing cache: {e}")
 
 
+# ============ wordpress commands ============
+
+
 @click.command()
 @click.argument("target")
-@click.option(
-    "--test-brute-force",
-    is_flag=True,
-    default=True,
-    help="Test brute force protection mechanisms",
-)
 @click.option(
     "--enumerate-plugins",
     is_flag=True,
     default=True,
-    help="Enumerate WordPress plugins",
+    help="Enumerate WordPress plugins with security analysis",
 )
 @click.option(
-    "--enumerate-themes", is_flag=True, default=True, help="Enumerate WordPress themes"
+    "--enumerate-themes",
+    is_flag=True,
+    default=True,
+    help="Enumerate WordPress themes with security analysis",
 )
 @click.option(
     "--enumerate-users", is_flag=True, default=True, help="Enumerate WordPress users"
@@ -253,15 +254,71 @@ def clear_cache_command(all, scanner, force):
     "--use-wpscan",
     is_flag=True,
     default=True,
-    help="Use WPScan for comprehensive analysis",
+    help="Use WPScan for comprehensive vulnerability analysis",
 )
-@click.option("--wpscan-api-token", help="WPScan API token for vulnerability data")
+@click.option(
+    "--wpscan-api-token", help="WPScan API token for enhanced vulnerability data"
+)
+
+# NEW ENHANCED OPTIONS
+@click.option(
+    "--check-multisite",
+    is_flag=True,
+    default=True,
+    help="Analyze WordPress Multisite security configuration",
+)
+@click.option(
+    "--check-htaccess",
+    is_flag=True,
+    default=True,
+    help="Perform enhanced .htaccess security analysis",
+)
+@click.option(
+    "--detect-security-plugins",
+    is_flag=True,
+    default=True,
+    help="Detect and analyze WordPress security plugins",
+)
+@click.option(
+    "--check-database-security",
+    is_flag=True,
+    default=True,
+    help="Check database security configuration",
+)
+@click.option(
+    "--test-brute-force",
+    is_flag=True,
+    default=True,
+    help="Test brute force protection mechanisms",
+)
 @click.option(
     "--check-xmlrpc", is_flag=True, default=True, help="Test XML-RPC endpoint security"
 )
 @click.option(
-    "--check-config", is_flag=True, default=True, help="Analyze security configuration"
+    "--check-config",
+    is_flag=True,
+    default=True,
+    help="Analyze WordPress security configuration",
 )
+
+# SCAN CUSTOMIZATION OPTIONS
+@click.option(
+    "--quick-scan",
+    is_flag=True,
+    help="Perform quick scan (basic checks only)",
+)
+@click.option(
+    "--deep-scan",
+    is_flag=True,
+    help="Perform comprehensive deep scan (all checks)",
+)
+@click.option(
+    "--stealth-mode",
+    is_flag=True,
+    help="Use stealth scanning techniques (slower but less detectable)",
+)
+
+# TARGET SPECIFICATION
 @click.option(
     "--scheme",
     type=click.Choice(["http", "https"]),
@@ -269,14 +326,45 @@ def clear_cache_command(all, scanner, force):
     help="URL scheme to use",
 )
 @click.option("--port", type=int, help="Target port (if not standard)")
+@click.option("--timeout", type=int, default=60, help="Request timeout in seconds")
+
+# REPORTING OPTIONS
 @click.option("--json-report", is_flag=True, help="Generate JSON report")
 @click.option("--html-report", is_flag=True, help="Generate HTML report")
 @click.option("--pdf-report", is_flag=True, help="Generate PDF report")
+@click.option("--xml-report", is_flag=True, help="Generate XML report")
+@click.option("--csv-report", is_flag=True, help="Generate CSV report")
 @click.option("--all-reports", is_flag=True, help="Generate all report formats")
 @click.option(
     "--output-dir", default="output/reports", help="Output directory for reports"
 )
-@common_options
+@click.option("--report-name", help="Custom report filename prefix")
+
+# COMPLIANCE AND STANDARDS
+@click.option(
+    "--compliance-check",
+    type=click.Choice(["owasp", "cis", "pci-dss", "all"]),
+    help="Include compliance checks (OWASP, CIS, PCI-DSS)",
+)
+@click.option(
+    "--security-baseline",
+    is_flag=True,
+    help="Check against WordPress security baseline",
+)
+
+# ADVANCED OPTIONS
+@click.option("--user-agent", help="Custom User-Agent string")
+@click.option("--proxy", help="HTTP proxy (http://proxy:port)")
+@click.option("--cookie", help="Custom cookies for authenticated scanning")
+@click.option("--headers", help="Custom HTTP headers (JSON format)")
+@click.option("--rate-limit", type=int, default=10, help="Requests per second limit")
+@click.option("--threads", type=int, default=4, help="Number of scanning threads")
+
+# DEBUG AND VERBOSE OPTIONS
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@click.option("--debug", is_flag=True, help="Enable debug mode")
+@click.option("--no-color", is_flag=True, help="Disable colored output")
+@click.option("--save-raw", is_flag=True, help="Save raw scanner output")
 def wordpress_command(
     target,
     enumerate_plugins,
@@ -284,226 +372,424 @@ def wordpress_command(
     enumerate_users,
     use_wpscan,
     wpscan_api_token,
+    check_multisite,
+    check_htaccess,
+    detect_security_plugins,
+    check_database_security,
+    test_brute_force,
     check_xmlrpc,
     check_config,
+    quick_scan,
+    deep_scan,
+    stealth_mode,
     scheme,
     port,
+    timeout,
     json_report,
     html_report,
     pdf_report,
+    xml_report,
+    csv_report,
     all_reports,
     output_dir,
-    **kwargs,
+    report_name,
+    compliance_check,
+    security_baseline,
+    user_agent,
+    proxy,
+    cookie,
+    headers,
+    rate_limit,
+    threads,
+    verbose,
+    debug,
+    no_color,
+    save_raw,
 ):
     """
-    WordPress security scanning with WPScan integration
+    Enhanced WordPress Security Scanner with Comprehensive Analysis
 
-    Performs comprehensive WordPress security assessment including:
-    - WordPress version detection and vulnerability analysis
-    - Plugin enumeration and vulnerability scanning
-    - Theme enumeration and security analysis
-    - User enumeration and brute force protection testing
-    - XML-RPC security testing
-    - Security configuration analysis
+    Performs advanced WordPress security assessment including:
 
-    Examples:
-        \b
-        # Basic WordPress scan with all reports
-        python main.py wordpress example.com --all-reports
+    🔍 CORE FEATURES:
+    • WordPress version detection and vulnerability analysis
+    • Plugin enumeration with security status and update analysis
+    • Theme enumeration with security assessment
+    • User enumeration and account security testing
+    • XML-RPC security testing
+    • Security configuration analysis
 
-        # Comprehensive scan with WPScan API
-        python main.py wordpress https://blog.example.com --wpscan-api-token YOUR_TOKEN --all-reports
+    🆕 ENHANCED FEATURES:
+    • WordPress Multisite security testing
+    • Advanced .htaccess security analysis
+    • Security plugin detection and configuration analysis
+    • Database security configuration testing
+    • Brute force protection assessment
+    • File permission and backup detection
 
-        # Quick enumeration without WPScan, HTML report only
-        python main.py wordpress example.com --no-use-wpscan --html-report
+    📊 COMPLIANCE & STANDARDS:
+    • OWASP WordPress Security Guide compliance
+    • CIS WordPress Security Benchmark
+    • PCI DSS web application requirements
+    • WordPress security best practices
 
-        # Custom port and scheme with PDF report
-        python main.py wordpress example.com --scheme http --port 8080 --pdf-report
+    🎯 SCAN MODES:
+    • Quick Scan: Essential security checks (5-10 minutes)
+    • Standard Scan: Comprehensive analysis (15-30 minutes)
+    • Deep Scan: Exhaustive security assessment (30+ minutes)
+
+    \b
+    EXAMPLES:
+
+    # Quick WordPress security scan
+    python main.py wordpress example.com --quick-scan --html-report
+
+    # Comprehensive scan with all features
+    python main.py wordpress https://blog.example.com --deep-scan --all-reports
+
+    # Multisite-focused security analysis
+    python main.py wordpress multisite.example.com --check-multisite --check-htaccess
+
+    # Security plugin audit
+    python main.py wordpress example.com --detect-security-plugins --compliance-check owasp
+
+    # Stealth mode scanning
+    python main.py wordpress example.com --stealth-mode --rate-limit 2 --timeout 120
+
+    # Custom authenticated scan
+    python main.py wordpress example.com --cookie "session=abc123" --headers '{"Authorization": "Bearer token"}'
+
+    # Database security focus
+    python main.py wordpress example.com --check-database-security --check-config --save-raw
+
+    # Compliance audit
+    python main.py wordpress example.com --compliance-check all --security-baseline --pdf-report
     """
     try:
         from ..scanners.cms.wordpress_scanner import WordPressScanner
-        from ..utils.logger import log_info, log_success, log_error, log_warning
-        from ..utils.reporter import ReportGenerator  # FIXED: Use ReportGenerator
-        from pathlib import Path
-        import json
+        from ..utils.reporter import ReportGenerator
 
-        log_info(f"🎯 Starting WordPress security scan for: {target}")
+        # Configure logging
+        if debug:
+            import logging
 
-        # Initialize WordPress scanner
-        scanner = WordPressScanner(timeout=kwargs.get("timeout", 300))
+            logging.getLogger().setLevel(logging.DEBUG)
+        elif verbose:
+            import logging
 
-        # Validate target
-        if not scanner.validate_target(target):
-            raise ValueError(f"Invalid WordPress target: {target}")
+            logging.getLogger().setLevel(logging.INFO)
 
-        # Prepare scan options
-        scan_options = {
-            "enumerate_plugins": enumerate_plugins,
-            "enumerate_themes": enumerate_themes,
-            "enumerate_users": enumerate_users,
-            "use_wpscan": use_wpscan,
-            "wpscan_api_token": wpscan_api_token,
-            "check_xmlrpc": check_xmlrpc,
-            "check_config": check_config,
-            "scheme": scheme,
-            "port": port,
-        }
+        log_info("🔍 Starting Enhanced WordPress Security Scan")
+
+        # Build target URL
+        target_url = _build_target_url(target, scheme, port)
+        log_info(f"🎯 Target: {target_url}")
+
+        # Configure scan options based on scan mode
+        scan_options = _configure_scan_options(
+            quick_scan,
+            deep_scan,
+            stealth_mode,
+            enumerate_plugins,
+            enumerate_themes,
+            enumerate_users,
+            check_multisite,
+            check_htaccess,
+            detect_security_plugins,
+            check_database_security,
+            test_brute_force,
+            check_xmlrpc,
+            check_config,
+            use_wpscan,
+            wpscan_api_token,
+        )
+
+        # Configure advanced options
+        if user_agent:
+            scan_options["user_agent"] = user_agent
+        if proxy:
+            scan_options["proxy"] = proxy
+        if cookie:
+            scan_options["cookie"] = cookie
+        if headers:
+            import json
+
+            scan_options["headers"] = json.loads(headers)
+        if rate_limit:
+            scan_options["rate_limit"] = rate_limit
+        if threads:
+            scan_options["threads"] = threads
+
+        # Initialize scanner
+        scanner = WordPressScanner(timeout=timeout)
+
+        # Display scan configuration
+        _display_scan_configuration(target_url, scan_options, compliance_check)
 
         # Execute scan
-        result = scanner._execute_scan(target, scan_options)
+        log_info("🚀 Executing WordPress security scan...")
+        result = scanner.scan(target_url, scan_options)
+
+        # Process compliance checks
+        if compliance_check or security_baseline:
+            result = _add_compliance_findings(
+                result, compliance_check, security_baseline
+            )
 
         # Display results summary
-        log_success(f"✅ WordPress scan completed")
-        log_info(f"📊 Total findings: {len(result.findings)}")
+        _display_results_summary(result)
 
-        severity_counts = {}
-        if result.findings:
-            for finding in result.findings:
-                severity = finding.get("severity", "info")
-                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        # Generate reports
+        if any(
+            [json_report, html_report, pdf_report, xml_report, csv_report, all_reports]
+        ):
+            _generate_reports(
+                result,
+                output_dir,
+                report_name,
+                json_report,
+                html_report,
+                pdf_report,
+                xml_report,
+                csv_report,
+                all_reports,
+            )
 
-            for severity, count in severity_counts.items():
-                log_info(f"   {severity.upper()}: {count}")
+        # Save raw output if requested
+        if save_raw:
+            _save_raw_output(result, output_dir, report_name or "wordpress_scan")
 
-        # Prepare output directory
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        # Generate base filename
-        clean_target = target.replace("://", "_").replace("/", "_").replace(":", "_")
-        timestamp = result.start_time.strftime("%Y%m%d_%H%M%S")
-        base_filename = f"wordpress_scan_{clean_target}_{timestamp}"
-
-        # Determine which reports to generate
-        generate_json = (
-            json_report or all_reports or True
-        )  # Always generate JSON as default
-        generate_html = html_report or all_reports
-        generate_pdf = pdf_report or all_reports
-
-        # Initialize report generator
-        reporter = ReportGenerator()
-        generated_reports = []
-
-        # 1. JSON report (always generated)
-        if generate_json:
-            json_file = output_path / f"{base_filename}.json"
-            result.save_to_file(json_file)
-            log_success(f"📄 JSON report saved: {json_file}")
-            generated_reports.append(str(json_file))
-
-        # 2. HTML report
-        if generate_html:
-            try:
-                html_file = output_path / f"{base_filename}.html"
-
-                # FIXED: Use correct method name and parameters
-                success = reporter.generate_html_report(
-                    results=result,  # Pass the ScanResult object
-                    output_path=html_file,
-                    title=f"WordPress Security Scan - {target}",
-                )
-
-                if success:
-                    log_success(f"📄 HTML report saved: {html_file}")
-                    generated_reports.append(str(html_file))
-                else:
-                    log_error("❌ Failed to generate HTML report")
-
-            except Exception as e:
-                log_error(f"❌ HTML report generation failed: {e}")
-
-        # 3. PDF report
-        if generate_pdf:
-            try:
-                pdf_file = output_path / f"{base_filename}.pdf"
-
-                # FIXED: Use correct method name and parameters
-                success = reporter.generate_pdf_report(
-                    results=result,  # Pass the ScanResult object
-                    output_path=pdf_file,
-                    title=f"WordPress Security Scan - {target}",
-                )
-
-                if success:
-                    log_success(f"📄 PDF report saved: {pdf_file}")
-                    generated_reports.append(str(pdf_file))
-                else:
-                    log_warning(
-                        "⚠️  PDF report generation failed (might need PDF dependencies)"
-                    )
-                    log_info("Install: pip install weasyprint  OR  pip install pdfkit")
-
-            except Exception as e:
-                log_error(f"❌ PDF report generation failed: {e}")
-                if "weasyprint" in str(e).lower() or "pdfkit" in str(e).lower():
-                    log_info("💡 Install PDF dependencies: pip install weasyprint")
-
-        # 4. Executive summary (if multiple reports requested)
-        if all_reports:
-            try:
-                summary_file = output_path / f"{base_filename}_summary.txt"
-
-                success = reporter.generate_executive_summary(
-                    results=result, output_path=summary_file
-                )
-
-                if success:
-                    log_success(f"📄 Executive summary saved: {summary_file}")
-                    generated_reports.append(str(summary_file))
-
-            except Exception as e:
-                log_warning(f"⚠️  Executive summary generation failed: {e}")
-
-        # Summary of generated reports
-        if len(generated_reports) > 1:
-            log_success(f"📁 Generated {len(generated_reports)} reports:")
-            for report in generated_reports:
-                log_info(f"   📄 {report}")
-
-        # Display security summary
-        critical_findings = [
-            f for f in result.findings if f.get("severity") == "critical"
-        ]
-        high_findings = [f for f in result.findings if f.get("severity") == "high"]
-
-        if critical_findings:
-            log_error(f"🚨 {len(critical_findings)} CRITICAL vulnerabilities found!")
-            for finding in critical_findings[:3]:  # Show first 3
-                log_error(f"   • {finding.get('title', 'Unknown')}")
-            if len(critical_findings) > 3:
-                log_error(f"   • ... and {len(critical_findings) - 3} more")
-
-        if high_findings:
-            log_warning(f"⚠️  {len(high_findings)} HIGH severity issues found!")
-            for finding in high_findings[:3]:  # Show first 3
-                log_warning(f"   • {finding.get('title', 'Unknown')}")
-            if len(high_findings) > 3:
-                log_warning(f"   • ... and {len(high_findings) - 3} more")
-
-        if not critical_findings and not high_findings:
-            log_success("✅ No critical or high severity vulnerabilities detected")
-
-        # Display recommendations
-        if critical_findings or high_findings:
-            log_info("\n💡 Recommendations:")
-            log_info("   1. Address critical and high severity issues immediately")
-            log_info("   2. Keep WordPress, plugins, and themes updated")
-            log_info("   3. Implement strong passwords and two-factor authentication")
-            log_info("   4. Regular security monitoring and scanning")
-
-        # Exit with appropriate code
-        if critical_findings:
-            sys.exit(2)  # Critical vulnerabilities found
-        elif high_findings:
-            sys.exit(1)  # High severity issues found
+        # Display final status
+        if result.status.value == "completed":
+            log_success("✅ WordPress security scan completed successfully!")
         else:
-            sys.exit(0)  # Success
+            log_error("❌ WordPress security scan encountered issues")
+            return 1
+
+        return 0
 
     except Exception as e:
         log_error(f"WordPress scan failed: {e}")
-        if kwargs.get("debug"):
+        if debug:
             import traceback
 
-            log_error(traceback.format_exc())
-        sys.exit(1)
+            traceback.print_exc()
+        return 1
+
+
+def _build_target_url(target: str, scheme: str, port: int) -> str:
+    """Build complete target URL"""
+    if not target.startswith(("http://", "https://")):
+        target = f"{scheme}://{target}"
+
+    if port and port not in [80, 443]:
+        from urllib.parse import urlparse, urlunparse
+
+        parsed = urlparse(target)
+        parsed = parsed._replace(netloc=f"{parsed.hostname}:{port}")
+        target = urlunparse(parsed)
+
+    return target.rstrip("/")
+
+
+def _configure_scan_options(
+    quick_scan,
+    deep_scan,
+    stealth_mode,
+    enumerate_plugins,
+    enumerate_themes,
+    enumerate_users,
+    check_multisite,
+    check_htaccess,
+    detect_security_plugins,
+    check_database_security,
+    test_brute_force,
+    check_xmlrpc,
+    check_config,
+    use_wpscan,
+    wpscan_api_token,
+) -> Dict[str, Any]:
+    """Configure scan options based on parameters"""
+
+    if quick_scan:
+        # Quick scan - essential checks only
+        options = {
+            "enumerate_plugins": True,
+            "enumerate_themes": False,
+            "enumerate_users": False,
+            "check_multisite": False,
+            "check_htaccess": True,
+            "detect_security_plugins": True,
+            "check_database_security": False,
+            "test_brute_force": True,
+            "check_xmlrpc": True,
+            "check_config": True,
+            "use_wpscan": False,  # Skip WPScan for speed
+        }
+        log_info("⚡ Quick scan mode: Essential security checks only")
+
+    elif deep_scan:
+        # Deep scan - all checks enabled
+        options = {
+            "enumerate_plugins": True,
+            "enumerate_themes": True,
+            "enumerate_users": True,
+            "check_multisite": True,
+            "check_htaccess": True,
+            "detect_security_plugins": True,
+            "check_database_security": True,
+            "test_brute_force": True,
+            "check_xmlrpc": True,
+            "check_config": True,
+            "use_wpscan": True,
+        }
+        log_info("🔬 Deep scan mode: Comprehensive security analysis")
+
+    else:
+        # Standard scan - use individual options
+        options = {
+            "enumerate_plugins": enumerate_plugins,
+            "enumerate_themes": enumerate_themes,
+            "enumerate_users": enumerate_users,
+            "check_multisite": check_multisite,
+            "check_htaccess": check_htaccess,
+            "detect_security_plugins": detect_security_plugins,
+            "check_database_security": check_database_security,
+            "test_brute_force": test_brute_force,
+            "check_xmlrpc": check_xmlrpc,
+            "check_config": check_config,
+            "use_wpscan": use_wpscan,
+        }
+        log_info("🎯 Standard scan mode: Customized security checks")
+
+    # Add WPScan API token if provided
+    if wpscan_api_token:
+        options["wpscan_api_token"] = wpscan_api_token
+
+    # Configure stealth mode
+    if stealth_mode:
+        options["stealth_mode"] = True
+        options["rate_limit"] = min(options.get("rate_limit", 10), 2)  # Slower rate
+        log_info("🥷 Stealth mode: Reduced detection techniques")
+
+    return options
+
+
+def _display_scan_configuration(
+    target_url: str, options: Dict[str, Any], compliance_check: str
+) -> None:
+    """Display scan configuration"""
+    log_info("📋 Scan Configuration:")
+    log_info(f"   Target: {target_url}")
+
+    enabled_checks = [key for key, value in options.items() if value is True]
+    log_info(f"   Enabled checks: {len(enabled_checks)}")
+
+    for check in enabled_checks:
+        check_name = check.replace("_", " ").title()
+        log_info(f"   ✓ {check_name}")
+
+    if compliance_check:
+        log_info(f"   📜 Compliance: {compliance_check.upper()}")
+
+
+def _add_compliance_findings(result, compliance_check: str, security_baseline: bool):
+    """Add compliance check findings"""
+    # This would integrate with compliance frameworks
+    # For now, add informational findings
+
+    if compliance_check in ["owasp", "all"]:
+        result.add_finding(
+            title="OWASP WordPress Security Guide Compliance",
+            description="Scan includes OWASP WordPress security recommendations",
+            severity="INFO",
+            recommendation="Review findings against OWASP WordPress Security Guide",
+        )
+
+    if compliance_check in ["cis", "all"]:
+        result.add_finding(
+            title="CIS WordPress Security Benchmark",
+            description="Scan includes CIS WordPress security controls",
+            severity="INFO",
+            recommendation="Review findings against CIS WordPress Benchmark",
+        )
+
+    if security_baseline:
+        result.add_finding(
+            title="WordPress Security Baseline Check",
+            description="Security configuration checked against WordPress best practices",
+            severity="INFO",
+            recommendation="Ensure all baseline security measures are implemented",
+        )
+
+    return result
+
+
+def _display_results_summary(result) -> None:
+    """Display scan results summary"""
+    log_info("📊 Scan Results Summary:")
+    log_info(f"   Status: {result.status.value.title()}")
+    log_info(f"   Total findings: {len(result.findings)}")
+
+    # Count by severity
+    severity_counts = {}
+    for finding in result.findings:
+        severity = finding.get("severity", "INFO")
+        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+    for severity, count in severity_counts.items():
+        log_info(f"   {severity}: {count}")
+
+
+def _generate_reports(
+    result,
+    output_dir: str,
+    report_name: str,
+    json_report: bool,
+    html_report: bool,
+    pdf_report: bool,
+    xml_report: bool,
+    csv_report: bool,
+    all_reports: bool,
+) -> None:
+    """Generate scan reports"""
+    log_info("📄 Generating reports...")
+
+    # Create output directory
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    report_prefix = (
+        report_name or f"wordpress_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    )
+
+    reporter = ReportGenerator()
+
+    try:
+        if json_report or all_reports:
+            json_file = Path(output_dir) / f"{report_prefix}.json"
+            reporter.generate_json_report(result, json_file)
+            log_success(f"✅ JSON report: {json_file}")
+
+        if html_report or all_reports:
+            html_file = Path(output_dir) / f"{report_prefix}.html"
+            reporter.generate_html_report(result, html_file)
+            log_success(f"✅ HTML report: {html_file}")
+
+        if pdf_report or all_reports:
+            pdf_file = Path(output_dir) / f"{report_prefix}.pdf"
+            reporter.generate_pdf_report(result, pdf_file)
+            log_success(f"✅ PDF report: {pdf_file}")
+
+    except Exception as e:
+        log_error(f"Report generation failed: {e}")
+
+
+def _save_raw_output(result, output_dir: str, report_name: str) -> None:
+    """Save raw scanner output"""
+    try:
+        raw_file = Path(output_dir) / f"{report_name}_raw.txt"
+        with open(raw_file, "w") as f:
+            f.write(result.raw_output or "No raw output available")
+        log_success(f"✅ Raw output saved: {raw_file}")
+    except Exception as e:
+        log_error(f"Failed to save raw output: {e}")

@@ -1,4 +1,4 @@
-# **Auto-Pentest Framework v0.9.1 - User Manual**
+# **Auto-Pentest Framework v0.9.5 - User Manual**
 
 ## 🚀 **Quick Start**
 
@@ -37,6 +37,7 @@ python main.py web https://scanme.nmap.org --use-nikto
 python main.py dns scanme.nmap.org --subdomain-enum
 python main.py directory https://scanme.nmap.org --wordlist
 python main.py wordpress https://scanme.nmap.org --all-reports
+python main.py api https://httpbin.org/json --owasp-only
 ```
 
 ---
@@ -110,6 +111,22 @@ python main.py ssl TARGET [OPTIONS]
   --cipher-enum                      # Cipher enumeration
   --cert-info                        # Certificate information
   --vulnerabilities                  # Vulnerability checks
+
+# WordPress Scanner
+python main.py wordpress TARGET [OPTIONS]
+  --enumerate-plugins                # Plugin enumeration and security analysis
+  --enumerate-themes                 # Theme enumeration and security analysis
+  --enumerate-users                  # User enumeration
+  --use-wpscan                       # Use WPScan integration
+  --wpscan-api-token TOKEN           # WPScan API token for enhanced data
+
+# API Security Scanner (NEW in v0.9.5)
+python main.py api TARGET [OPTIONS]
+  --timeout SECONDS                  # Request timeout (default: 30)
+  --rate-limit-test                  # Enable rate limiting assessment
+  --graphql-test                     # Enable GraphQL security testing
+  --jwt-analysis                     # Enable JWT token security analysis
+  --owasp-only                       # Focus only on OWASP API Top 10 tests
 ```
 
 ### **Utility Commands**
@@ -153,240 +170,357 @@ python main.py scan https://scanme.nmap.org --profile web --all-reports
 python main.py scan scanme.nmap.org --include-web --include-ssl --include-directory --html-report
 ```
 
-#### **3. Comprehensive Assessment**
+#### **3. API Security Testing (NEW)**
 ```bash
-# Full scan + multiple report formats
-python main.py full scanme.nmap.org --output ./reports/
+# Comprehensive API security assessment
+python main.py api https://httpbin.org/json --rate-limit-test --graphql-test --jwt-analysis
 
-# Or manual control
-python main.py scan scanme.nmap.org --include-port --include-dns --include-web --include-directory --include-ssl --all-reports --parallel
+# Quick OWASP API Top 10 scan
+python main.py api https://api.example.com --owasp-only --timeout 60
+
+# GraphQL-specific testing
+python main.py api https://api.example.com/graphql --graphql-test --verbose
+
+# API security with output
+python main.py api https://httpbin.org/json --all-reports --output ./api_results
 ```
 
-#### **4. Targeted Scans Without Reports**
+#### **4. WordPress Security Assessment**
 ```bash
-# SSL assessment only
-python main.py ssl scanme.nmap.org --vulnerabilities --cert-info
+# Complete WordPress security analysis
+python main.py wordpress https://example.com --wpscan-api-token YOUR_TOKEN
 
-# Specific ports only  
-python main.py port scanme.nmap.org --ports 80,443,8080,8443 --fast
-
-# Directory enumeration only
-python main.py directory https://scanme.nmap.org --tool gobuster --wordlist /usr/share/wordlists/dirb/common.txt
+# Quick WordPress check
+python main.py wordpress https://example.com --enumerate-plugins --enumerate-users
 ```
 
-#### **5. Specialized DNS Analysis**
+#### **5. Infrastructure Security Assessment**
 ```bash
-# Comprehensive DNS testing
-python main.py dns scanme.nmap.org --subdomain-enum --zone-transfer --dns-bruteforce --verbose
+# Full infrastructure scan + reports
+python main.py full scanme.nmap.org
+
+# Or step-by-step
+python main.py scan scanme.nmap.org --include-port --include-dns --include-ssl --all-reports
 ```
 
-#### **6. Custom Output Directory**
+#### **6. Focused SSL/TLS Analysis**
 ```bash
-# Save to specific path
-python main.py scan scanme.nmap.org --include-ssl --include-web --all-reports --output ./my_reports/
+# SSL-only with reports
+python main.py scan https://scanme.nmap.org --include-ssl --html-report
 
-# View generated files
-ls -la ./my_reports/
+# Or direct SSL command
+python main.py ssl https://scanme.nmap.org --vulnerabilities --cert-info
+```
+
+#### **7. Directory and File Discovery**
+```bash
+# Directory enumeration with custom wordlist
+python main.py directory https://scanme.nmap.org --wordlist /usr/share/wordlists/dirb/common.txt
+
+# Multiple file extensions
+python main.py directory https://scanme.nmap.org --extensions php,asp,jsp,txt
 ```
 
 ---
 
-## 📋 **Available Profiles**
+## 🎯 **API Security Scanner - Detailed Usage**
 
-### **Quick Profile** ⚡
-- Includes: Port scanning (common ports)
-- Duration: 2-3 minutes
-- Best for: Initial reconnaissance
+### **What is API Security Scanner?**
 
-### **Web Profile** 🌐  
-- Includes: Web scanning + SSL analysis + Directory enumeration
-- Duration: 10-15 minutes
-- Best for: Website assessment
+The API Security Scanner implements **OWASP API Security Top 10 (2023)** testing methodology to identify vulnerabilities in REST APIs, GraphQL endpoints, and web APIs.
 
-### **Full Profile** 🔍
-- Includes: All scanners
-- Duration: 20-60 minutes (depends on target)
-- Best for: Comprehensive assessment
+### **Key Features:**
+- ✅ **REST API Discovery**: Automatic endpoint discovery
+- ✅ **GraphQL Security**: Introspection and depth attack testing
+- ✅ **JWT Analysis**: Token security assessment
+- ✅ **Rate Limiting**: Abuse protection testing
+- ✅ **OWASP Compliance**: Complete API Top 10 coverage
+- ✅ **Authentication Testing**: Bypass detection
+- ✅ **Authorization Testing**: BOLA/BFLA vulnerability detection
 
-### **Custom Profile** ⚙️
-- Includes: Manual selection with `--include-*`
-- Duration: Variable
-- Best for: Specific requirements
+### **API Scanner Options:**
+
+```bash
+python main.py api TARGET [OPTIONS]
+
+# Required:
+TARGET                               # API URL, endpoint, or domain
+
+# Optional:
+--timeout SECONDS                    # Request timeout (default: 30)
+--rate-limit-test                    # Test API rate limiting protection
+--graphql-test                       # Enable GraphQL security testing
+--jwt-analysis                       # Analyze JWT tokens if found
+--owasp-only                         # Focus only on OWASP API Top 10
+
+# Common options:
+--output DIR                         # Save results to directory
+--verbose                            # Detailed output
+--format json                        # Output format
+```
+
+### **API Testing Examples:**
+
+#### **Basic API Security Scan:**
+```bash
+# Simple API assessment
+python main.py api https://httpbin.org/json
+
+# With timeout adjustment
+python main.py api https://api.slow-example.com --timeout 60
+```
+
+#### **Comprehensive API Testing:**
+```bash
+# Full feature testing
+python main.py api https://api.example.com \
+  --rate-limit-test \
+  --graphql-test \
+  --jwt-analysis \
+  --verbose \
+  --output ./api_scan_results
+```
+
+#### **GraphQL-Specific Testing:**
+```bash
+# GraphQL endpoint testing
+python main.py api https://api.example.com/graphql --graphql-test
+
+# GraphQL with rate limiting
+python main.py api https://api.example.com/graphql --graphql-test --rate-limit-test
+```
+
+#### **OWASP Compliance Testing:**
+```bash
+# OWASP API Top 10 focused scan
+python main.py api https://api.example.com --owasp-only --verbose
+
+# Quick compliance check
+python main.py api https://api.example.com --owasp-only --timeout 30
+```
+
+#### **API Discovery and Testing:**
+```bash
+# Test various API endpoints
+python main.py api https://example.com --verbose          # Auto-discover APIs
+python main.py api https://example.com/api --jwt-analysis # Specific API path
+python main.py api https://example.com:8080 --rate-limit-test # Custom port
+```
+
+### **API Scanner Output:**
+
+The API scanner provides:
+- **Risk Score** (0-100): Overall security risk assessment
+- **OWASP Coverage**: Which of the 10 categories were tested
+- **Findings by Severity**: Critical, High, Medium, Low, Info
+- **Technical Details**: Specific vulnerabilities and recommendations
+
+### **Sample API Scanner Output:**
+```
+🎯 API Security Scanner Results:
+   Target: https://api.example.com
+   Risk Score: 65/100
+   OWASP API Top 10 Coverage: 8/10 categories
+
+📊 Findings by Severity:
+   HIGH: 2 findings
+   MEDIUM: 5 findings  
+   LOW: 3 findings
+   INFO: 7 findings
+
+🔍 Key Issues Found:
+   - Authentication bypass possible
+   - Rate limiting not implemented
+   - GraphQL introspection enabled
+   - Missing security headers
+```
 
 ---
 
-## 🎯 **Key Difference: Reports vs No Reports**
+## 🔧 **Configuration and Customization**
 
-### ✅ **Commands with automatic reports:**
+### **Output Formats**
 ```bash
-python main.py quick scanme.nmap.org              # ✅ Generates reports
-python main.py full scanme.nmap.org               # ✅ Generates reports  
-python main.py scan scanme.nmap.org --all-reports # ✅ Generates reports
+# JSON output (structured data)
+python main.py api https://api.example.com --format json --output ./results
+
+# Verbose text output
+python main.py api https://api.example.com --verbose --format txt
+
+# CSV format for analysis
+python main.py api https://api.example.com --format csv --output ./results
 ```
 
-### ❌ **Commands without reports (terminal display only):**
+### **Advanced Usage Patterns**
+
+#### **Multiple API Testing:**
 ```bash
-python main.py ssl scanme.nmap.org                # ❌ No report files
-python main.py port scanme.nmap.org               # ❌ No report files
-python main.py web scanme.nmap.org                # ❌ No report files
+#!/bin/bash
+# Script to test multiple APIs
+APIS=(
+  "https://api.service1.com"
+  "https://api.service2.com/v1"
+  "https://internal-api.company.com/graphql"
+)
+
+for api in "${APIS[@]}"; do
+  echo "Testing: $api"
+  python main.py api "$api" --owasp-only --output "./results/$(basename $api)"
+done
 ```
 
-### 🔧 **Solution: Combine with scan command for reports:**
+#### **CI/CD Integration:**
 ```bash
-# Instead of:
-python main.py ssl scanme.nmap.org
+# API security in CI/CD pipeline
+python main.py api $API_ENDPOINT \
+  --owasp-only \
+  --timeout 120 \
+  --format json \
+  --output ./security_reports/api_scan.json
 
-# Use:
-python main.py scan scanme.nmap.org --include-ssl --all-reports
+# Check exit code for CI/CD decisions
+if [ $? -eq 0 ]; then
+  echo "API security scan completed"
+else
+  echo "API security scan failed"
+  exit 1
+fi
 ```
 
 ---
 
-## 🛠️ **Troubleshooting**
+## 📋 **Troubleshooting**
 
-### **Common Issues**
+### **Common Issues and Solutions**
 
-#### **1. Tool Not Found**
+#### **API Scanner Issues:**
+
+**Problem**: "Invalid target" error
 ```bash
-# Check available tools
-python main.py list-tools --check-status
-
-# Install required tools (Ubuntu/Debian)
-sudo apt update
-sudo apt install nmap nikto dirb gobuster sslscan
+# Solution: Ensure target is a valid URL or domain
+python main.py api https://api.example.com  # ✅ Correct
+python main.py api api.example.com          # ✅ Also works
+python main.py api invalid..url             # ❌ Invalid
 ```
 
-#### **2. Permission Issues**
+**Problem**: Timeout errors
 ```bash
-# For privileged ports
-sudo python main.py scan scanme.nmap.org --include-port
-
-# Or use non-privileged ports
-python main.py port scanme.nmap.org --ports 80,443,8080,8443
+# Solution: Increase timeout for slow APIs
+python main.py api https://slow-api.com --timeout 120
 ```
 
-#### **3. PDF Generation Issues**
+**Problem**: GraphQL testing not working
 ```bash
-# Check PDF library
-python -c "import weasyprint; print('✅ PDF OK')"
-
-# Install if missing
-pip install weasyprint
-
-# System dependencies (Ubuntu/Debian)
-sudo apt install libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0
+# Solution: Ensure GraphQL endpoint is correct
+python main.py api https://api.example.com/graphql --graphql-test
 ```
 
-#### **4. Timeout Issues**
-```bash
-# Increase timeout
-python main.py scan scanme.nmap.org --timeout 1800 --include-port --include-ssl
+#### **General Scanner Issues:**
 
-# Sequential execution for slow networks
-python main.py scan scanme.nmap.org --sequential --timeout 3600
+**Problem**: "Command not found" error
+```bash
+# Solution: Ensure you're in the project directory
+cd /path/to/auto-pentest-framework
+python main.py api https://api.example.com
 ```
 
-#### **5. Memory Issues**
+**Problem**: Missing dependencies
 ```bash
-# Reduce threads
-python main.py scan scanme.nmap.org --threads 2 --sequential
+# Solution: Install requirements
+pip install -r requirements.txt
+```
 
-# Clear cache
-python main.py clear-cache --all --force
+**Problem**: Permission errors
+```bash
+# Solution: Check file permissions or use different output directory
+python main.py api https://api.example.com --output ~/api_results
 ```
 
 ---
 
-## 📁 **Output File Structure**
+## 📊 **Report Generation**
 
-### **Default Paths:**
-```
-output/
-├── reports/          # Generated reports
-├── logs/            # Log files  
-└── cache/           # Scan cache
-```
+### **Available Report Formats**
 
-### **Report File Types:**
+The framework generates different types of reports:
+
+#### **1. JSON Reports** (Structured data)
 ```bash
-# Available formats
-security_report_target_20241201_143022.html    # Interactive HTML report
-security_report_target_20241201_143022.pdf     # Printable PDF report
-security_report_target_20241201_143022.json    # Structured data
-security_report_target_20241201_143022.txt     # Text summary
-security_report_target_20241201_143022.csv     # Tabular format
+python main.py scan target --json-report
+python main.py api https://api.example.com --format json --output ./reports
 ```
+
+#### **2. HTML Reports** (Visual, shareable)
+```bash
+python main.py scan target --html-report
+```
+
+#### **3. PDF Reports** (Professional, printable)
+```bash
+python main.py scan target --pdf-report
+```
+
+#### **4. Text Reports** (Simple, readable)
+```bash
+python main.py api https://api.example.com --format txt --verbose
+```
+
+### **Report Contents**
+
+Each report includes:
+- **Executive Summary**: High-level overview
+- **Technical Findings**: Detailed vulnerability information
+- **Risk Assessment**: Severity ratings and impact analysis
+- **Recommendations**: Actionable remediation steps
+- **Appendices**: Raw output and technical details
 
 ---
 
 ## 🎯 **Best Practices**
 
-### **Before Scanning:**
-- [ ] Written authorization obtained for scanning
-- [ ] Scope clearly defined  
-- [ ] System requirements verified
-- [ ] Output directory prepared
+### **Scanning Best Practices**
 
-### **During Scanning:**
-- [ ] Start with safe targets (scanme.nmap.org)
-- [ ] Use quick profile for initial testing
-- [ ] Monitor system resources
-- [ ] Manage scan timing appropriately
+1. **Always start with quick scans** for initial assessment
+2. **Use verbose mode** for debugging and detailed analysis
+3. **Save outputs** for historical tracking and compliance
+4. **Test in stages** rather than running all scanners at once
+5. **Respect rate limits** and avoid overwhelming target systems
 
-### **After Scanning:**
-- [ ] Review results before delivery
-- [ ] Generate reports in multiple formats
-- [ ] Store files securely
-- [ ] Document lessons learned
+### **API Security Testing Best Practices**
 
----
+1. **Start with OWASP-focused scans** for compliance
+2. **Test authentication endpoints** specifically
+3. **Enable GraphQL testing** for GraphQL APIs
+4. **Use appropriate timeouts** for different API speeds
+5. **Document findings** for development teams
 
-## 📞 **Help & Reference**
+### **Security Considerations**
 
-### **Getting Help:**
-```bash
-python main.py --help              # General help
-python main.py scan --help         # Scan command help
-python main.py ssl --help          # SSL scanner help
-```
-
-### **System Information:**
-```bash
-python main.py info                # Framework capabilities
-python main.py list-tools          # Installed tools
-python main.py version             # Version information
-```
-
-### **Cache Management:**
-```bash
-python main.py cache-stats         # Cache status
-python main.py clear-cache --all   # Clear cache
-```
+1. **Only scan systems you own** or have permission to test
+2. **Be mindful of rate limits** to avoid service disruption
+3. **Use appropriate scan intensity** for production systems
+4. **Review findings carefully** before acting on them
+5. **Keep scan results secure** as they contain sensitive information
 
 ---
 
-## 🎊 **Important Summary**
+## 📚 **Additional Resources**
 
-### **For Report Generation:**
-✅ **Use:** `scan`, `quick`, `full`  
-❌ **Don't use:** `ssl`, `port`, `web`, `dns`, `directory` (no reports)
+### **Documentation**
+- `docs/installation_guide.md` - Complete installation instructions
+- `docs/troubleshooting_guide.md` - Problem resolution guide
+- `docs/development_guide.md` - For developers and contributors
 
-### **Recommended Commands:**
-```bash
-# Quick start
-python main.py quick scanme.nmap.org
+### **External Resources**
+- [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
+- [WordPress Security Guidelines](https://wordpress.org/support/article/hardening-wordpress/)
+- [Nmap Reference Guide](https://nmap.org/book/)
 
-# Comprehensive assessment  
-python main.py full scanme.nmap.org
-
-# Precise control
-python main.py scan scanme.nmap.org --include-ssl --include-web --all-reports --output ./reports/
-```
+### **Community and Support**
+- GitHub Issues for bug reports and feature requests
+- Documentation for comprehensive guides
+- Community contributions welcome
 
 ---
 
-**🚀 Auto-Pentest Framework v0.9.1 is ready to use!**
-
-This framework is designed for security teams, consultants, and researchers to conduct professional security assessments with comprehensive reporting capabilities.
-
-**Happy scanning! 🔒**
+**🎉 Congratulations! You're now ready to use the Auto-Pentest Framework v0.9.5 with the new API Security Scanner. Happy testing!** 🚀

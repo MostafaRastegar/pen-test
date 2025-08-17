@@ -8,6 +8,8 @@ import sys
 from typing import Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime
+
+from src.core.scanner_base import ScanStatus
 from .options import common_options
 from ..services.scan_service import ScanService
 from ..services.scanner_service import ScannerService
@@ -16,6 +18,77 @@ from ..services.utility_services import CacheService, ToolService, VersionServic
 from ..utils.target_parser import TargetParser
 from ..utils.logger import log_info, log_error, log_success, log_warning
 from ..utils.reporter import ReportGenerator
+from ..scanners.api.api_scanner import APISecurityScanner
+
+
+@click.command()
+@click.argument("target")
+@click.option("--timeout", default=30, help="Request timeout in seconds")
+@click.option("--rate-limit-test", is_flag=True, help="Enable rate limiting assessment")
+@click.option("--graphql-test", is_flag=True, help="Enable GraphQL security testing")
+@click.option("--jwt-analysis", is_flag=True, help="Enable JWT token security analysis")
+@click.option("--owasp-only", is_flag=True, help="Focus only on OWASP API Top 10 tests")
+@common_options
+def api_command(
+    target, timeout, rate_limit_test, graphql_test, jwt_analysis, owasp_only, **kwargs
+):
+    """API Security Scanner - Comprehensive API vulnerability assessment"""
+    try:
+        log_info(f"Starting API security scan for: {target}")
+
+        # Initialize scanner
+        scanner = APISecurityScanner(timeout=timeout)
+
+        # Validate target using scanner's method
+        if not scanner.validate_target(target):
+            log_error(f"Invalid target: {target}")
+            sys.exit(1)
+
+        # Prepare scan options
+        options = {
+            "rate_limit_test": rate_limit_test,
+            "graphql_test": graphql_test,
+            "jwt_analysis": jwt_analysis,
+            "owasp_only": owasp_only,
+        }
+
+        # Execute scan
+        result = scanner.scan(target, options)
+
+        if result.status == ScanStatus.COMPLETED:
+            log_success(f"API scan completed successfully!")
+            log_info(f"Found {len(result.findings)} findings")
+
+            # Display risk score if available
+            risk_score = result.metadata.get("risk_score", "N/A")
+            log_info(f"Risk Score: {risk_score}")
+
+            # Display OWASP coverage
+            owasp_coverage = result.metadata.get("owasp_coverage", {})
+            covered_categories = len(
+                [cat for cat, count in owasp_coverage.items() if count > 0]
+            )
+            log_info(f"OWASP API Top 10 Coverage: {covered_categories}/10 categories")
+
+            # Display findings summary by severity
+            from collections import defaultdict
+
+            severity_count = defaultdict(int)
+            for finding in result.findings:
+                severity_count[finding.get("severity", "info")] += 1
+
+            if severity_count:
+                log_info("Findings by severity:")
+                for severity, count in severity_count.items():
+                    log_info(f"  {severity.upper()}: {count}")
+
+        else:
+            log_error(f"API scan failed")
+            sys.exit(1)
+
+    except Exception as e:
+        log_error(f"API scanner error: {e}")
+        sys.exit(1)
 
 
 @click.command()

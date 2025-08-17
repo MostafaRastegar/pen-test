@@ -15,6 +15,9 @@ from .vulnerability.ssl_scanner import SSLScanner
 # Phase 1.1: CMS-Specific Vulnerability Scanners
 from .cms import WordPressScanner
 
+from .api.api_scanner import APISecurityScanner
+
+
 # Scanner registry for dynamic loading
 SCANNER_REGISTRY = {
     # Reconnaissance scanners
@@ -26,6 +29,8 @@ SCANNER_REGISTRY = {
     "ssl": SSLScanner,
     # CMS scanners
     "wordpress": WordPressScanner,
+    # Phase 2.1: API Security Scanner
+    "api": APISecurityScanner,
 }
 
 # Category-based organization
@@ -42,6 +47,10 @@ SCANNERS_BY_CATEGORY = {
     "cms": {
         "wordpress": WordPressScanner,
     },
+    # Phase 2.1: API Security Category
+    "api": {
+        "api": APISecurityScanner,
+    },
 }
 
 # Export all scanners
@@ -55,6 +64,8 @@ __all__ = [
     "SSLScanner",
     # CMS
     "WordPressScanner",
+    # API Security
+    "APISecurityScanner",
     # Registry
     "SCANNER_REGISTRY",
     "SCANNERS_BY_CATEGORY",

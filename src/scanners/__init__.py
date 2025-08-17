@@ -13,7 +13,7 @@ from .vulnerability.directory_scanner import DirectoryScanner
 from .vulnerability.ssl_scanner import SSLScanner
 
 # Phase 1.1: CMS-Specific Vulnerability Scanners
-from .cms.wordpress_scanner import WordPressScanner
+from .cms import WordPressScanner
 
 # Scanner registry for dynamic loading
 SCANNER_REGISTRY = {

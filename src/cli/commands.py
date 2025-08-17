@@ -466,7 +466,7 @@ def wordpress_command(
     python main.py wordpress example.com --compliance-check all --security-baseline --pdf-report
     """
     try:
-        from ..scanners.cms.wordpress_scanner import WordPressScanner
+        from ..scanners.cms import WordPressScanner
         from ..utils.reporter import ReportGenerator
 
         # Configure logging

@@ -20,12 +20,12 @@ from src.core import ScannerBase, ScanResult, ScanStatus, ScanSeverity
 from src.utils.logger import log_info, log_error, log_warning, log_success
 
 # Import modular components
-from .wordpress_core import WordPressCore
-from .wordpress_detector import WordPressDetector
-from .wordpress_plugins import WordPressPlugins
-from .wordpress_themes import WordPressThemes
-from .wordpress_users import WordPressUsers
-from .wordpress_security import WordPressSecurity
+from .wordpress.wordpress_core import WordPressCore
+from .wordpress.wordpress_detector import WordPressDetector
+from .wordpress.wordpress_plugins import WordPressPlugins
+from .wordpress.wordpress_themes import WordPressThemes
+from .wordpress.wordpress_users import WordPressUsers
+from .wordpress.wordpress_security import WordPressSecurity
 
 
 class WordPressScanner(ScannerBase):

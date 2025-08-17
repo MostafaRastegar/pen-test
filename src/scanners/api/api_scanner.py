@@ -264,7 +264,7 @@ class APISecurityScanner(ScannerBase):
                         findings.append(
                             {
                                 "type": "endpoint_discovery",
-                                "severity": ScanSeverity.INFO,
+                                "severity": ScanSeverity.INFO.value,
                                 "title": f"API Endpoint Discovered: {endpoint}",
                                 "description": f"Active API endpoint found at {test_url}",
                                 "url": test_url,

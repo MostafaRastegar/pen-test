@@ -21,6 +21,9 @@ from ..utils.reporter import ReportGenerator
 from ..scanners.api.api_scanner import APISecurityScanner
 
 
+# COMPLETE REPLACEMENT for api_command in src/cli/commands.py
+
+
 @click.command()
 @click.argument("target")
 @click.option("--timeout", default=30, help="Request timeout in seconds")
@@ -28,9 +31,25 @@ from ..scanners.api.api_scanner import APISecurityScanner
 @click.option("--graphql-test", is_flag=True, help="Enable GraphQL security testing")
 @click.option("--jwt-analysis", is_flag=True, help="Enable JWT token security analysis")
 @click.option("--owasp-only", is_flag=True, help="Focus only on OWASP API Top 10 tests")
+@click.option("--json-report", is_flag=True, help="Generate JSON report")
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
+@click.option("--pdf-report", is_flag=True, help="Generate PDF report")
+@click.option("--all-reports", is_flag=True, help="Generate all report formats")
+@click.option("--output-dir", default="reports", help="Output directory for reports")
 @common_options
 def api_command(
-    target, timeout, rate_limit_test, graphql_test, jwt_analysis, owasp_only, **kwargs
+    target,
+    timeout,
+    rate_limit_test,
+    graphql_test,
+    jwt_analysis,
+    owasp_only,
+    json_report,
+    html_report,
+    pdf_report,
+    all_reports,
+    output_dir,
+    **kwargs,
 ):
     """API Security Scanner - Comprehensive API vulnerability assessment"""
     try:
@@ -55,39 +74,115 @@ def api_command(
         # Execute scan
         result = scanner.scan(target, options)
 
-        if result.status == ScanStatus.COMPLETED:
-            log_success(f"API scan completed successfully!")
-            log_info(f"Found {len(result.findings)} findings")
+        if result and result.status == ScanStatus.COMPLETED:
+            log_success("✅ API scan completed successfully!")
+            log_info(f"ℹ️ Found {len(result.findings)} findings")
 
             # Display risk score if available
             risk_score = result.metadata.get("risk_score", "N/A")
-            log_info(f"Risk Score: {risk_score}")
+            log_info(f"ℹ️ Risk Score: {risk_score}")
 
             # Display OWASP coverage
             owasp_coverage = result.metadata.get("owasp_coverage", {})
             covered_categories = len(
                 [cat for cat, count in owasp_coverage.items() if count > 0]
             )
-            log_info(f"OWASP API Top 10 Coverage: {covered_categories}/10 categories")
+            log_info(f"ℹ️ OWASP API Top 10 Coverage: {covered_categories}/10 categories")
 
-            # Display findings summary by severity
+            # Display findings summary by severity (FIXED VERSION)
             from collections import defaultdict
+
+            def _safe_severity_key(severity_value):
+                """Get normalized severity key for counting"""
+                if hasattr(severity_value, "value"):
+                    return severity_value.value.lower()
+                elif isinstance(severity_value, str):
+                    return severity_value.lower()
+                else:
+                    return str(severity_value).lower()
 
             severity_count = defaultdict(int)
             for finding in result.findings:
-                severity_count[finding.get("severity", "info")] += 1
+                severity = finding.get("severity", "info")
+                severity_key = _safe_severity_key(severity)
+                severity_count[severity_key] += 1
 
             if severity_count:
-                log_info("Findings by severity:")
-                for severity, count in severity_count.items():
-                    log_info(f"  {severity.upper()}: {count}")
+                log_info("ℹ️ Findings by severity:")
+                for severity_key, count in severity_count.items():
+                    log_info(f"   {severity_key.upper()}: {count}")
+
+            # SIMPLE REPORT GENERATION (INSERT THE CODE FROM ABOVE)
+
+            # ALWAYS save basic results
+            try:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                clean_target = (
+                    target.replace("://", "_")
+                    .replace("/", "_")
+                    .replace(".", "_")
+                    .replace(":", "_")
+                )
+                results_file = f"api_results_{clean_target}_{timestamp}.json"
+
+                # Safe conversion function
+                def safe_severity_str(severity_value):
+                    if hasattr(severity_value, "value"):
+                        return severity_value.value
+                    elif isinstance(severity_value, str):
+                        return severity_value
+                    else:
+                        return str(severity_value)
+
+                # Convert findings to safe format
+                safe_findings = []
+                for finding in result.findings:
+                    safe_finding = finding.copy()
+                    safe_finding["severity"] = safe_severity_str(
+                        finding.get("severity", "info")
+                    )
+                    safe_findings.append(safe_finding)
+
+                with open(results_file, "w") as f:
+                    import json
+
+                    scan_data = {
+                        "target": target,
+                        "timestamp": timestamp,
+                        "findings": safe_findings,
+                        "metadata": result.metadata,
+                        "scanner_name": result.scanner_name,
+                        "status": (
+                            result.status.value
+                            if hasattr(result.status, "value")
+                            else str(result.status)
+                        ),
+                        "summary": {
+                            "total_findings": len(result.findings),
+                            "risk_score": result.metadata.get("risk_score", 0),
+                            "severity_breakdown": dict(severity_count),
+                        },
+                    }
+                    json.dump(scan_data, f, indent=2, default=str)
+
+                log_success(f"✅ Results saved: {results_file}")
+
+            except Exception as e:
+                log_error(f"❌ Failed to save results: {e}")
 
         else:
-            log_error(f"API scan failed")
+            log_error(f"❌ API scan failed")
+            if result and hasattr(result, "errors") and result.errors:
+                for error in result.errors:
+                    log_error(f"   Error: {error}")
             sys.exit(1)
 
     except Exception as e:
-        log_error(f"API scanner error: {e}")
+        log_error(f"❌ API scanner error: {e}")
+        if kwargs.get("debug"):
+            import traceback
+
+            traceback.print_exc()
         sys.exit(1)
 
 
@@ -808,7 +903,8 @@ def _display_results_summary(result) -> None:
     severity_counts = {}
     for finding in result.findings:
         severity = finding.get("severity", "INFO")
-        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+        severity_key = _safe_severity_key(severity)
+        severity_counts[severity_key] = severity_counts.get(severity_key, 0) + 1
 
     for severity, count in severity_counts.items():
         log_info(f"   {severity}: {count}")
@@ -866,3 +962,26 @@ def _save_raw_output(result, output_dir: str, report_name: str) -> None:
         log_success(f"✅ Raw output saved: {raw_file}")
     except Exception as e:
         log_error(f"Failed to save raw output: {e}")
+
+
+def _safe_severity_display(severity_value):
+    """Safely convert severity to displayable string"""
+    if hasattr(severity_value, "value"):
+        # It's a ScanSeverity enum object
+        return severity_value.value.upper()
+    elif isinstance(severity_value, str):
+        # It's already a string
+        return severity_value.upper()
+    else:
+        # Fallback for unknown types
+        return str(severity_value).upper()
+
+
+def _safe_severity_key(severity_value):
+    """Get normalized severity key for counting"""
+    if hasattr(severity_value, "value"):
+        return severity_value.value.lower()
+    elif isinstance(severity_value, str):
+        return severity_value.lower()
+    else:
+        return str(severity_value).lower()

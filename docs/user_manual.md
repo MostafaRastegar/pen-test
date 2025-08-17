@@ -247,6 +247,16 @@ python main.py api https://api.example.com --rate-limit-testing
 
 # JWT token analysis
 python main.py api https://api.example.com --jwt-analysis
+
+# Basic scan with JSON report
+python main.py api https://api.example.com --json-report
+
+# All reports
+python main.py api https://api.example.com --all-reports
+
+# Custom output directory
+python main.py api https://api.example.com --json-report --output-dir my_reports
+
 ```
 
 #### **API Scanner Features**

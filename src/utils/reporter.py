@@ -283,8 +283,18 @@ class ReportGenerator:
             log_error(f"Failed to generate compliance report: {e}")
             return False
 
-    def _aggregate_report_data(self, results: List[ScanResult]) -> Dict[str, Any]:
+    def _aggregate_report_data(
+        self, results: List[ScanResult], title: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Aggregate scan results into report data structure"""
+
+        # SAFE FIX: Always ensure title is defined
+        if title is None:
+            if results and len(results) > 0:
+                title = f"Security Assessment Report - {results[0].target}"
+            else:
+                title = "Security Assessment Report"
+
         if not results:
             return {}
 

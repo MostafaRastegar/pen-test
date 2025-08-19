@@ -126,9 +126,6 @@ class WAFScanner(ScannerBase):
             ],
         }
 
-    # Remove the scan method - it's already implemented in ScannerBase
-    # and calls _execute_scan which we implement below
-
     def _execute_scan(self, target: str, options: Dict[str, Any]) -> ScanResult:
         """
         Execute WAF detection and bypass testing scan
@@ -155,21 +152,36 @@ class WAFScanner(ScannerBase):
             # Normalize target URL
             target_url = self._normalize_target_url(target)
 
-            # Phase 1: Basic WAF Detection
+            # Check if detection-only mode is enabled
+            detection_only = options.get("detection_only", False)
+            if detection_only:
+                log_info("Detection-only mode enabled - skipping bypass testing")
+
+            # Phase 1: Basic WAF Detection (always run)
             log_info("Phase 1: Basic WAF detection and fingerprinting")
             basic_detection = self._perform_basic_waf_detection(target_url)
 
-            # Phase 2: Advanced Behavioral Analysis
+            # Phase 2: Advanced Behavioral Analysis (always run)
             log_info("Phase 2: Advanced behavioral pattern analysis")
             behavioral_analysis = self._perform_behavioral_analysis(target_url)
 
-            # Phase 3: Bypass Technique Testing
-            log_info("Phase 3: Bypass technique testing and evaluation")
-            bypass_results = self._test_bypass_techniques(target_url)
+            # Initialize containers for optional phases
+            bypass_results = {"findings": [], "summary": {}}
+            effectiveness_assessment = {"findings": [], "summary": {}}
 
-            # Phase 4: WAF Effectiveness Assessment
-            log_info("Phase 4: WAF effectiveness and security assessment")
-            effectiveness_assessment = self._assess_waf_effectiveness(target_url)
+            # Phase 3: Bypass Technique Testing (skip if detection-only)
+            if not detection_only:
+                log_info("Phase 3: Bypass technique testing and evaluation")
+                bypass_results = self._test_bypass_techniques(target_url)
+            else:
+                log_info("Phase 3: Skipped (detection-only mode)")
+
+            # Phase 4: WAF Effectiveness Assessment (skip if detection-only)
+            if not detection_only:
+                log_info("Phase 4: WAF effectiveness and security assessment")
+                effectiveness_assessment = self._assess_waf_effectiveness(target_url)
+            else:
+                log_info("Phase 4: Skipped (detection-only mode)")
 
             # Compile comprehensive findings
             findings = []
@@ -190,17 +202,28 @@ class WAFScanner(ScannerBase):
                 {
                     "scan_type": "waf_detection",
                     "target_url": target_url,
+                    "detection_only": detection_only,  # Add this flag to metadata
                     "waf_detected": self.detection_results["waf_detected"],
                     "detected_wafs": self.detection_results["waf_vendors"],
                     "confidence_score": self.detection_results["confidence_score"],
-                    "bypass_success_rate": self._calculate_bypass_success_rate(),
+                    "bypass_success_rate": (
+                        self._calculate_bypass_success_rate()
+                        if not detection_only
+                        else 0
+                    ),
                     "risk_score": risk_score,
                     "scan_phases": {
                         "basic_detection": basic_detection.get("summary", {}),
                         "behavioral_analysis": behavioral_analysis.get("summary", {}),
-                        "bypass_testing": bypass_results.get("summary", {}),
-                        "effectiveness_assessment": effectiveness_assessment.get(
-                            "summary", {}
+                        "bypass_testing": (
+                            bypass_results.get("summary", {})
+                            if not detection_only
+                            else {"skipped": True}
+                        ),
+                        "effectiveness_assessment": (
+                            effectiveness_assessment.get("summary", {})
+                            if not detection_only
+                            else {"skipped": True}
                         ),
                     },
                 }
@@ -209,7 +232,13 @@ class WAFScanner(ScannerBase):
             result.status = ScanStatus.COMPLETED
             result.end_time = datetime.now()
 
-            log_success(f"WAF detection scan completed for {target}")
+            # Log completion message
+            if detection_only:
+                log_success(
+                    f"WAF detection scan completed for {target} (detection-only mode)"
+                )
+            else:
+                log_success(f"WAF detection scan completed for {target}")
 
         except Exception as e:
             log_error(f"WAF scanner error: {e}")

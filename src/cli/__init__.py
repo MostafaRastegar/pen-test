@@ -19,6 +19,7 @@ from .commands import (
     ssl_command,
     wordpress_command,  # Phase 1.1: WordPress Scanner
     api_command,  # Phase 2.1: API Security Scanner
+    waf_command,  # Phase 2.2: WAF Detection Engine - ADD THIS LINE
     version_command,
     cache_stats_command,
     clear_cache_command,
@@ -77,6 +78,8 @@ def create_cli_app():
 
     # Phase 2.1: API Security Scanner
     cli.add_command(api_command, name="api")
+
+    cli.add_command(waf_command, name="waf")
 
     # Utility commands
     cli.add_command(cache_stats_command, name="cache-stats")

@@ -21,7 +21,53 @@ from ..utils.reporter import ReportGenerator
 from ..scanners.api.api_scanner import APISecurityScanner
 
 
-# COMPLETE REPLACEMENT for api_command in src/cli/commands.py
+@click.command()
+@click.argument("target")
+@click.option("--aggressive", is_flag=True, help="Aggressive WAF testing mode")
+@click.option(
+    "--detection-only", is_flag=True, help="Skip bypass testing (detection only)"
+)
+@click.option(
+    "--quick", is_flag=True, help="Quick detection mode (basic detection only)"
+)
+@click.option("--timeout", default=300, help="Scan timeout in seconds")
+@click.option("--json-report", is_flag=True, help="Generate JSON report")
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
+@click.option("--pdf-report", is_flag=True, help="Generate PDF report")
+@click.option("--all-reports", is_flag=True, help="Generate all report formats")
+@click.option(
+    "--output-dir", default="output/reports", help="Output directory for reports"
+)
+@click.option(
+    "--auto-save", is_flag=True, default=True, help="Automatically save reports"
+)
+@common_options
+def waf_command(target, aggressive, detection_only, quick, timeout, **kwargs):
+    """WAF Detection and bypass testing"""
+    try:
+        scanner_service = ScannerService()
+
+        # Set performance options
+        if quick:
+            log_info("Quick mode enabled - basic detection only")
+            timeout = min(timeout, 60)  # Max 60 seconds for quick mode
+            kwargs["quick_mode"] = True
+            kwargs["detection_only"] = True  # Quick implies detection-only
+
+        # Always enable automatic report generation
+        if not kwargs.get("output"):
+            kwargs["output"] = "output/reports"
+        kwargs["save_raw"] = True
+
+        log_info(f"Reports will be saved to: {kwargs['output']}")
+
+        scanner_service.run_waf_scan(
+            target, aggressive, detection_only or quick, timeout, kwargs
+        )
+
+    except Exception as e:
+        log_error(f"WAF scan failed: {e}")
+        sys.exit(1)
 
 
 @click.command()

@@ -4,7 +4,7 @@
 
 The Auto-Pentest Framework is a comprehensive security assessment platform that automates penetration testing workflows with enterprise-grade reporting. This manual covers all scanners and features available in version 0.9.6.
 
-### **🎯 Current Scanner Suite (90% Complete)**
+### **🎯 Complete Scanner Suite (100% Complete - 8/8 Scanners)**
 - ✅ **Port Scanner** - Network reconnaissance and service discovery
 - ✅ **DNS Scanner** - Domain name system analysis and enumeration  
 - ✅ **Web Scanner** - Web application security assessment
@@ -13,6 +13,7 @@ The Auto-Pentest Framework is a comprehensive security assessment platform that 
 - ✅ **WordPress Scanner** - CMS-specific vulnerability assessment
 - ✅ **API Security Scanner** - REST/GraphQL API security testing
 - ✅ **WAF Detection Engine** - Web Application Firewall detection and bypass testing
+- ✅ **Network Vulnerability Scanner** - Advanced network vulnerability assessment using Nuclei
 
 ---
 
@@ -27,6 +28,10 @@ cd auto-pentest-framework
 # Install dependencies
 pip install -r requirements.txt
 
+# Install Nuclei for network scanning
+sudo apt install nuclei
+# or download from: https://github.com/projectdiscovery/nuclei
+
 # Verify installation
 python main.py --version
 ```
@@ -38,6 +43,9 @@ python main.py port 192.168.1.1
 
 # Web application scan
 python main.py web https://example.com
+
+# Network vulnerability scan (NEW!)
+python main.py network 192.168.1.1
 
 # Complete assessment
 python main.py scan example.com --profile full
@@ -196,31 +204,24 @@ Comprehensive WordPress CMS security assessment.
 # Basic WordPress scan
 python main.py wordpress https://wordpress-site.com
 
-# Plugin enumeration
-python main.py wordpress https://wordpress-site.com --enumerate-plugins
+# Plugin security analysis
+python main.py wordpress https://wordpress-site.com --plugin-check
 
-# User enumeration
-python main.py wordpress https://wordpress-site.com --enumerate-users
+# Theme security analysis
+python main.py wordpress https://wordpress-site.com --theme-check
 ```
 
 #### **Advanced Options**
 ```bash
-# Theme analysis
-python main.py wordpress https://wordpress-site.com --enumerate-themes
+# Complete WordPress assessment
+python main.py wordpress https://wordpress-site.com --plugin-check --theme-check --user-enum --brute-force-test
 
-# Security configuration
-python main.py wordpress https://wordpress-site.com --security-checks
+# With WPScan API token
+python main.py wordpress https://wordpress-site.com --wpscan-api-token YOUR_TOKEN
 
-# Vulnerability assessment
-python main.py wordpress https://wordpress-site.com --vulnerability-scan
+# Timeout adjustment
+python main.py wordpress https://wordpress-site.com --timeout 600
 ```
-
-#### **WordPress Scanner Features**
-- **Plugin Security Analysis**: 50+ vulnerable plugins database
-- **Theme Security Assessment**: Custom and known theme vulnerabilities
-- **User Security Evaluation**: Multi-vector user enumeration and analysis
-- **Brute Force Protection Testing**: Login security mechanism assessment
-- **Security Plugin Detection**: Major WordPress security solutions analysis
 
 ### **7. API Security Scanner**
 REST and GraphQL API security testing with OWASP API Top 10 coverage.
@@ -230,636 +231,337 @@ REST and GraphQL API security testing with OWASP API Top 10 coverage.
 # Basic API scan
 python main.py api https://api.example.com
 
-# REST API testing
-python main.py api https://api.example.com/v1 --api-type rest
-
 # GraphQL testing
-python main.py api https://api.example.com/graphql --api-type graphql
+python main.py api https://api.example.com/graphql --graphql-test
+
+# JWT analysis
+python main.py api https://api.example.com --jwt-analysis
 ```
 
 #### **Advanced Options**
 ```bash
-# Authentication testing
-python main.py api https://api.example.com --auth-testing
+# Complete API assessment
+python main.py api https://api.example.com --rate-limit-test --graphql-test --jwt-analysis --owasp-only
 
-# Rate limiting assessment
-python main.py api https://api.example.com --rate-limit-testing
+# With authentication
+python main.py api https://api.example.com --auth-header "Bearer TOKEN"
 
-# JWT token analysis
-python main.py api https://api.example.com --jwt-analysis
-
-# Basic scan with JSON report
-python main.py api https://api.example.com --json-report
-
-# All reports
-python main.py api https://api.example.com --all-reports
-
-# Custom output directory
-python main.py api https://api.example.com --json-report --output-dir my_reports
-
+# Swagger/OpenAPI testing
+python main.py api https://api.example.com --swagger-url https://api.example.com/swagger.json
 ```
 
-#### **API Scanner Features**
-- **OWASP API Top 10 (2023)**: Complete coverage of all 10 categories
-- **REST API Discovery**: 29+ endpoint patterns for comprehensive enumeration
-- **GraphQL Security**: Introspection attacks and depth testing
-- **JWT Token Analysis**: Token extraction and vulnerability detection
-- **Authorization Testing**: BOLA/BFLA comprehensive assessment
-- **API Documentation Security**: Swagger/OpenAPI security analysis
-
-### **8. WAF Detection Engine** 🆕
-Web Application Firewall detection and bypass testing capabilities.
+### **8. WAF Detection Engine**
+Web Application Firewall detection and bypass testing.
 
 #### **Basic Usage**
 ```bash
 # Basic WAF detection
 python main.py waf https://example.com
 
-# WAF detection with domain
-python main.py waf example.com
+# Quick detection mode
+python main.py waf https://example.com --quick
 
-# Verbose output
-python main.py waf https://example.com --verbose
+# Detection only (no bypass testing)
+python main.py waf https://example.com --detection-only
 ```
 
 #### **Advanced Options**
 ```bash
-# Extended timeout for thorough testing
-python main.py waf https://example.com --timeout 600
-
-# Aggressive testing mode
+# Aggressive testing with bypass attempts
 python main.py waf https://example.com --aggressive
 
-# Skip bypass testing (detection only)
-python main.py waf https://example.com --detection-only
+# Complete WAF assessment with all reports
+python main.py waf https://example.com --aggressive --all-reports
+
+# Custom timeout
+python main.py waf https://example.com --timeout 600
 ```
 
-#### **WAF Scanner Features**
-- **WAF Vendor Detection**: 8 major vendors (Cloudflare, AWS WAF, Akamai, F5, Imperva, Fortinet, Sucuri, ModSecurity)
-- **Behavioral Analysis**: Advanced response pattern matching and timing analysis
-- **Bypass Testing**: 42+ evasion payloads across 4 attack vectors (SQL injection, XSS, LFI, Command injection)
-- **Effectiveness Assessment**: Comprehensive WAF security posture evaluation
-- **Real-time Adaptation**: Dynamic payload modification based on WAF responses
+### **9. Network Vulnerability Scanner** 🆕
+Advanced network vulnerability assessment using Nuclei templates.
 
-#### **Supported WAF Vendors**
-- **Cloudflare**: CF-Ray headers, error patterns, behavioral analysis
-- **AWS WAF**: Amazon-specific signatures and response patterns
-- **Akamai**: EdgeScape detection and fingerprinting
-- **F5 Big-IP**: ASM mode detection and configuration analysis
-- **Imperva/Incapsula**: Security response patterns and blocking behavior
-- **Fortinet**: FortiGate/FortiWeb signatures and protection analysis
-- **Sucuri**: Website firewall detection and security assessment
-- **ModSecurity**: Apache module signatures and rule analysis
+#### **Basic Usage**
+```bash
+# Basic network vulnerability scan
+python main.py network 192.168.1.1
 
-#### **Bypass Testing Categories**
-- **SQL Injection**: 13+ techniques with encoding variations
-- **Cross-Site Scripting (XSS)**: 12+ evasion methods and filter bypasses
-- **Local File Inclusion (LFI)**: 8+ path traversal and encoding bypasses
-- **Command Injection**: 9+ system command evasion techniques
+# Critical vulnerabilities only
+python main.py network 192.168.1.1 --templates critical
+
+# High and critical severity
+python main.py network 192.168.1.1 --templates high
+```
+
+#### **Advanced Options**
+```bash
+# Complete network assessment with all severity levels
+python main.py network 192.168.1.1 --templates all --service-analysis --protocol-analysis
+
+# Custom rate limiting
+python main.py network 192.168.1.1 --rate-limit 100
+
+# Custom template path
+python main.py network 192.168.1.1 --templates custom --template-path /path/to/templates
+
+# Extended timeout for large scans
+python main.py network 192.168.1.1 --timeout 1200
+
+# With comprehensive reporting
+python main.py network 192.168.1.1 --templates high --all-reports --output-dir ~/network-reports
+```
+
+#### **Template Options**
+- **`critical`** - Only critical severity vulnerabilities
+- **`high`** - High and critical severity  
+- **`medium`** - Medium, high, and critical (default)
+- **`all`** - All templates regardless of severity
+- **`custom`** - Use custom template path
+
+#### **Network Scanner Features**
+- **🎯 Nuclei Integration** - Uses latest Nuclei templates (5000+ templates)
+- **🔍 CVE Detection** - Comprehensive CVE vulnerability scanning
+- **🌐 Protocol Support** - HTTP, HTTPS, TCP, UDP protocols
+- **⚡ Rate Limiting** - Configurable request rate (default: 150/sec)
+- **📊 Detailed Reporting** - JSON, HTML, and PDF reports
+- **🎲 Service Analysis** - Network service security assessment
+- **🔧 Custom Templates** - Support for custom Nuclei templates
 
 ---
 
-## 🎯 **Workflow Orchestration**
+## 📊 **Report Generation**
 
-### **Profile-Based Scanning**
+### **Individual Scanner Reports**
 ```bash
-# Quick scan (essential checks)
-python main.py scan target.com --profile quick
+# JSON report
+python main.py network 192.168.1.1 --json-report
 
-# Standard scan (balanced coverage)
-python main.py scan target.com --profile standard
-
-# Full scan (comprehensive assessment)
-python main.py scan target.com --profile full
-
-# Custom scan profile
-python main.py scan target.com --profile custom --scanners port,web,waf
-```
-
-### **Parallel Execution**
-```bash
-# Parallel scanner execution
-python main.py scan target.com --parallel --max-threads 4
-
-# Resource management
-python main.py scan target.com --parallel --memory-limit 4GB
-
-# Performance monitoring
-python main.py scan target.com --parallel --performance-monitoring
-```
-
-### **Target Management**
-```bash
-# Multiple targets
-python main.py scan target1.com,target2.com,192.168.1.1
-
-# Target file
-python main.py scan --target-file targets.txt
-
-# CIDR notation
-python main.py scan 192.168.1.0/24
-```
-
----
-
-## 📊 **Output and Reporting**
-
-### **Output Formats**
-```bash
-# JSON output
-python main.py port 192.168.1.1 --output json
-
-# XML output
-python main.py port 192.168.1.1 --output xml
-
-# CSV output
-python main.py port 192.168.1.1 --output csv
-
-# Text output (default)
-python main.py port 192.168.1.1 --output text
-```
-
-### **Report Generation**
-```bash
-# HTML report
-python main.py scan target.com --report html
+# HTML report  
+python main.py network 192.168.1.1 --html-report
 
 # PDF report
-python main.py scan target.com --report pdf
+python main.py network 192.168.1.1 --pdf-report
 
-# Combined reports
-python main.py scan target.com --report html,pdf
+# All report formats
+python main.py network 192.168.1.1 --all-reports
 
-# Custom report template
-python main.py scan target.com --report html --template custom
-```
-
-### **Output Management**
-```bash
 # Custom output directory
-python main.py scan target.com --output-dir /path/to/results
+python main.py network 192.168.1.1 --all-reports --output-dir ~/security-reports
+```
 
-# Timestamped outputs
-python main.py scan target.com --timestamp
+### **Orchestrated Scan Reports**
+```bash
+# Complete assessment with all scanners
+python main.py scan example.com --profile full --all-reports
 
-# Compressed results
-python main.py scan target.com --compress
+# Custom scanner selection
+python main.py scan example.com --include-network --include-web --include-ssl --html-report
+```
+
+### **Report Types**
+
+#### **1. Raw JSON Data**
+- Complete scan results in JSON format
+- Suitable for automation and integration
+- Contains all technical details
+
+#### **2. Formatted JSON Report**
+- Structured report with summary statistics
+- Severity breakdown and risk analysis
+- Machine-readable format
+
+#### **3. HTML Report**
+- Professional, web-viewable report
+- Interactive severity charts
+- Responsive design for all devices
+- Suitable for stakeholder review
+
+#### **4. PDF Report**
+- Print-ready professional report
+- Executive summary included
+- Suitable for compliance documentation
+- Requires weasyprint or wkhtmltopdf
+
+---
+
+## 🔧 **Installation Requirements**
+
+### **Core Dependencies**
+```bash
+# Network & Web Security Tools
+- nmap (Network scanning)
+- nikto (Web vulnerability scanning)  
+- dirb/gobuster (Directory enumeration)
+- sslscan (SSL/TLS analysis)
+- nuclei (Network vulnerability scanning) ⭐ NEW
+
+# CMS Security Tools
+- wpscan (WordPress security scanner)
+
+# Python Libraries
+- requests, dnspython, click, rich
+- weasyprint (PDF generation - optional)
+```
+
+### **Nuclei Installation** 🆕
+```bash
+# Method 1: APT (Recommended for Debian/Ubuntu)
+sudo apt update && sudo apt install nuclei
+
+# Method 2: Direct download
+wget https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.4.6_linux_amd64.zip
+unzip nuclei_3.4.6_linux_amd64.zip
+sudo mv nuclei /usr/local/bin/
+
+# Method 3: Go install (if Go is installed)
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# Method 4: Snap
+sudo snap install nuclei
+
+# Verify installation
+nuclei -version
+
+# Update templates
+nuclei -update-templates
 ```
 
 ---
 
-## ⚙️ **Configuration**
+## 🎯 **Best Practices**
 
-### **Configuration Files**
+### **Network Vulnerability Scanning**
+1. **Start with Critical** - Begin with `--templates critical` for high-priority issues
+2. **Rate Limiting** - Use appropriate `--rate-limit` to avoid overwhelming targets
+3. **Template Updates** - Regularly update Nuclei templates: `nuclei -update-templates`
+4. **Custom Templates** - Create custom templates for organization-specific checks
+5. **Report Everything** - Use `--all-reports` for comprehensive documentation
+
+### **Responsible Scanning**
+1. **Authorization** - Only scan systems you own or have explicit permission to test
+2. **Rate Limiting** - Use conservative rate limits to avoid service disruption
+3. **Time Windows** - Perform scans during appropriate maintenance windows
+4. **Monitoring** - Monitor target systems during scans for any issues
+5. **Documentation** - Document all findings and remediation steps
+
+### **Performance Optimization**
+1. **Template Selection** - Use specific severity levels rather than `--templates all`
+2. **Timeout Management** - Adjust `--timeout` based on network conditions
+3. **Parallel Scanning** - Use orchestrated scans for multiple targets
+4. **Cache Management** - Clear cache regularly with `python main.py clear-cache`
+
+---
+
+## 🏆 **Advanced Usage Examples**
+
+### **Complete Infrastructure Assessment**
 ```bash
-# System configuration
-config/scanner_config.yaml
+# Network discovery and vulnerability assessment
+python main.py port 192.168.1.0/24 --fast
+python main.py network 192.168.1.1-254 --templates high --all-reports
 
-# User preferences
-~/.autopentest/config.yaml
+# Web application security testing
+python main.py web https://app.example.com --directory-enum --ssl-analysis
+python main.py waf https://app.example.com --aggressive
+python main.py api https://api.example.com --graphql-test --jwt-analysis
 
-# Project-specific settings
-./pentest_config.yaml
+# CMS-specific testing
+python main.py wordpress https://blog.example.com --plugin-check --theme-check --user-enum
 ```
 
-### **Environment Variables**
+### **Compliance Scanning**
 ```bash
-# Scanner timeout
-export AUTOPENTEST_TIMEOUT=300
+# PCI DSS compliance scanning
+python main.py scan payment.example.com --include-ssl --include-network --include-web --compliance pci
 
-# Output directory
-export AUTOPENTEST_OUTPUT_DIR=/tmp/pentest
-
-# Debug mode
-export AUTOPENTEST_DEBUG=true
+# OWASP Top 10 assessment
+python main.py api https://api.example.com --owasp-only --all-reports
+python main.py web https://app.example.com --owasp-testing --html-report
 ```
 
-### **Tool Dependencies**
+### **Automated Security Monitoring**
 ```bash
-# Check tool availability
-python main.py check-tools
+# Daily vulnerability checks
+python main.py network production-server.com --templates critical --json-report --output-dir /var/log/security/
 
-# List available scanners
-python main.py list-scanners
-
-# Scanner capabilities
-python main.py scanner-info waf
+# Weekly comprehensive assessment
+python main.py scan production-environment.com --profile full --all-reports --output-dir /reports/weekly/
 ```
 
 ---
 
-## 🔧 **Advanced Features**
+## 🔍 **Troubleshooting**
 
-### **Authentication**
+### **Network Scanner Issues**
 ```bash
-# HTTP Basic Authentication
-python main.py web https://example.com --auth basic:username:password
+# Check Nuclei installation
+nuclei -version
+which nuclei
 
-# Custom headers
-python main.py web https://example.com --header "Authorization: Bearer token"
+# Update templates
+nuclei -update-templates
 
-# Session cookies
-python main.py web https://example.com --cookie "session=value"
+# Test Nuclei directly
+nuclei -target https://httpbin.org/get -templates info
+
+# Check scanner availability
+python main.py network --help
 ```
-
-### **Proxy and Network**
-```bash
-# HTTP proxy
-python main.py web https://example.com --proxy http://proxy:8080
-
-# SOCKS proxy
-python main.py web https://example.com --proxy socks5://proxy:1080
-
-# Custom DNS
-python main.py dns example.com --dns-server 8.8.8.8
-
-# Network interface
-python main.py port 192.168.1.1 --interface eth0
-
-# Source port
-python main.py port 192.168.1.1 --source-port 12345
-```
-
-### **Performance Tuning**
-```bash
-# Custom timeout
-python main.py web https://example.com --timeout 60
-
-# Rate limiting
-python main.py directory https://example.com --delay 2
-
-# Thread control
-python main.py scan target.com --max-threads 8
-
-# Memory management
-python main.py scan target.com --memory-limit 2GB
-```
-
-### **Security Options**
-```bash
-# Skip SSL verification (testing only)
-python main.py web https://example.com --no-ssl-verify
-
-# Safe mode (read-only tests)
-python main.py scan target.com --safe-mode
-
-# Ethical testing mode
-python main.py scan target.com --ethical
-```
-
----
-
-## 🛡️ **Security Guidelines**
-
-### **Ethical Testing Principles**
-- **Authorization Required**: Only test systems you own or have explicit written permission to test
-- **Scope Compliance**: Stay within the defined scope of testing
-- **Impact Awareness**: Understand potential impact of scanning activities
-- **Responsible Disclosure**: Follow coordinated disclosure practices for vulnerabilities
-- **Legal Compliance**: Ensure compliance with local laws and regulations
-
-### **Best Practices**
-```bash
-# Rate limiting to avoid overloading targets
-python main.py scan target.com --delay 1
-
-# Respectful scanning
-python main.py scan target.com --polite
-
-# Logging for audit trails
-python main.py scan target.com --log-level info
-
-# Safe testing mode
-python main.py scan target.com --safe-mode
-```
-
-### **WAF Testing Ethics**
-- **Bypass Testing**: Only test WAF bypass techniques on systems you own
-- **Detection Impact**: Be aware that bypass testing may trigger security alerts
-- **Rate Limiting**: Use built-in delays to avoid overwhelming WAF systems
-- **Documentation**: Document all testing activities for compliance
-
----
-
-## 📈 **Performance Optimization**
-
-### **Scanner Performance**
-```bash
-# Fast scan modes
-python main.py port target.com --fast
-python main.py directory target.com --quick
-
-# Parallel processing
-python main.py scan target.com --parallel
-
-# Caching optimization
-python main.py scan target.com --cache-results
-
-# Resource monitoring
-python main.py scan target.com --monitor-resources
-```
-
-### **Output Optimization**
-```bash
-# Minimal output
-python main.py scan target.com --quiet
-
-# Essential findings only
-python main.py scan target.com --critical-only
-
-# Compressed results
-python main.py scan target.com --compress
-```
-
----
-
-## 🐛 **Troubleshooting**
 
 ### **Common Issues**
+1. **"Nuclei not found"** - Install Nuclei using methods above
+2. **"No templates found"** - Run `nuclei -update-templates`
+3. **"Connection timeout"** - Increase `--timeout` value
+4. **"Rate limited"** - Decrease `--rate-limit` value
+5. **"Permission denied"** - Check network permissions and firewall rules
 
-#### **Permission Errors**
+### **Report Generation Issues**
+1. **PDF generation fails** - Install weasyprint: `pip install weasyprint`
+2. **Large reports** - Use `--output-dir` with sufficient disk space
+3. **Special characters** - Reports use UTF-8 encoding automatically
+
+---
+
+## 📞 **Support**
+
+### **Getting Help**
 ```bash
-# Error: Permission denied for raw socket operations
-sudo python main.py port target.com
+# Framework help
+python main.py --help
 
-# Alternative: Use non-privileged scan
-python main.py port target.com --no-privileged
+# Scanner-specific help
+python main.py network --help
+python main.py api --help
+
+# Check versions
+python main.py version
+
+# List available tools
+python main.py list-tools
 ```
 
-#### **Tool Dependencies**
+### **Logging and Debugging**
 ```bash
-# Error: Tool not found
-python main.py check-tools
-
-# Install missing tools
-sudo apt install nmap nikto dirb gobuster sslscan
-
-# Manual tool path
-export NMAP_PATH=/usr/bin/nmap
-```
-
-#### **Network Issues**
-```bash
-# Error: Connection timeout
-python main.py web target.com --timeout 120
-
-# Error: DNS resolution
-python main.py web target.com --dns-server 8.8.8.8
-
-# Error: SSL certificate
-python main.py web target.com --no-ssl-verify
-```
-
-#### **WAF Scanner Issues**
-```bash
-# Error: WAF detection timeout
-python main.py waf target.com --timeout 300
-
-# Error: Rate limiting triggered
-python main.py waf target.com --delay 2
-
-# Error: Connection refused
-python main.py waf target.com --user-agent "Mozilla/5.0"
-```
-
-### **Debug Mode**
-```bash
-# Enable debug logging
-python main.py scan target.com --debug
-
 # Verbose output
-python main.py scan target.com --verbose
+python main.py network 192.168.1.1 --verbose
 
-# Save debug logs
-python main.py scan target.com --debug --log-file debug.log
+# Debug mode
+python main.py network 192.168.1.1 --debug
+
+# Check logs
+tail -f output/logs/pentest.log
 ```
 
 ---
 
-## 📋 **Command Reference**
+## 🎉 **Conclusion**
 
-### **Global Options**
-```bash
---version               Show version information
---help                  Show help message
---config FILE          Use custom configuration file
---output-dir DIR        Set output directory
---timeout SECONDS       Set global timeout
---verbose               Enable verbose output
---debug                 Enable debug mode
---quiet                 Minimize output
---log-file FILE         Save logs to file
-```
+The Auto-Pentest Framework v0.9.6 now provides a complete security assessment platform with 8 specialized scanners, including the powerful new Network Vulnerability Scanner. The framework offers enterprise-grade reporting, comprehensive coverage of security assessment needs, and professional documentation suitable for compliance and stakeholder communication.
 
-### **Scanner Options**
-```bash
---profile PROFILE       Use scan profile (quick/standard/full/custom)
---scanners LIST         Specify scanners to use
---parallel              Enable parallel execution
---max-threads NUM       Maximum concurrent threads
---delay SECONDS         Delay between requests
---user-agent STRING     Custom user agent
---proxy URL             Proxy server URL
---timeout SECONDS       Scanner timeout
---output FORMAT         Output format (json/xml/csv/text)
---report FORMAT         Report format (html/pdf)
-```
+For advanced usage, integration scenarios, and development information, please refer to the Development Guide and API Documentation.
 
-### **Target Options**
-```bash
---target-file FILE      Read targets from file
---exclude FILE          Exclude targets from file
---include-private       Include private IP ranges
---dns-server IP         Custom DNS server
---source-ip IP          Source IP address
---interface IFACE       Network interface
-```
-
----
-
-## 📚 **Examples and Use Cases**
-
-### **External Penetration Testing**
-```bash
-# Phase 1: Reconnaissance
-python main.py dns target.com --subdomains
-python main.py port target.com --comprehensive
-
-# Phase 2: Service Analysis
-python main.py web https://target.com --directory-enum
-python main.py ssl target.com:443 --vuln-testing
-
-# Phase 3: Application Testing
-python main.py wordpress https://target.com/blog
-python main.py api https://api.target.com
-
-# Phase 4: WAF Analysis
-python main.py waf https://target.com --aggressive
-```
-
-### **Internal Network Assessment**
-```bash
-# Network discovery
-python main.py port 192.168.1.0/24 --fast
-
-# Service enumeration
-python main.py port 192.168.1.1-100 --service-detection
-
-# Web application testing
-python main.py web http://internal-app.local
-
-# Complete internal scan
-python main.py scan 192.168.1.0/24 --profile internal
-```
-
-### **API Security Assessment**
-```bash
-# API discovery
-python main.py api https://api.example.com --discovery
-
-# Authentication testing
-python main.py api https://api.example.com --auth-testing
-
-# GraphQL specific testing
-python main.py api https://api.example.com/graphql --graphql-introspection
-
-# OWASP API Top 10 testing
-python main.py api https://api.example.com --owasp-testing
-```
-
-### **WordPress Security Audit**
-```bash
-# Basic WordPress scan
-python main.py wordpress https://wp-site.com
-
-# Plugin vulnerability assessment
-python main.py wordpress https://wp-site.com --plugin-vulns
-
-# User security analysis
-python main.py wordpress https://wp-site.com --user-security
-
-# Comprehensive WordPress audit
-python main.py wordpress https://wp-site.com --comprehensive
-```
-
-### **WAF Assessment Scenarios**
-```bash
-# WAF detection and identification
-python main.py waf https://protected-site.com
-
-# Bypass testing for penetration testing
-python main.py waf https://target.com --bypass-testing
-
-# WAF effectiveness assessment
-python main.py waf https://client-site.com --effectiveness-assessment
-
-# Custom payload testing
-python main.py waf https://target.com --custom-payloads payloads.txt
-```
-
----
-
-## 🔄 **Integration**
-
-### **CI/CD Pipeline Integration**
-```yaml
-# Example GitHub Actions workflow
-- name: Security Scan
-  run: |
-    python main.py scan ${{ env.TARGET_URL }} --profile standard
-    python main.py waf ${{ env.TARGET_URL }} --detection-only
-```
-
-### **API Integration**
-```python
-# Python integration example
-from auto_pentest import AutoPentestFramework
-
-framework = AutoPentestFramework()
-result = framework.scan_target("example.com", profile="standard")
-
-# WAF detection integration
-waf_result = framework.scan_waf("https://example.com")
-if waf_result.waf_detected:
-    print(f"WAF detected: {waf_result.detected_wafs}")
-```
-
-### **SIEM Integration**
-```bash
-# Send results to SIEM
-python main.py scan target.com --siem-output --siem-server siem.company.com
-```
-
----
-
-## 📊 **Scanner Comparison Matrix**
-
-| Scanner | Target Type | Speed | Depth | Use Case |
-|---------|-------------|--------|-------|----------|
-| **Port** | IP/Network | Fast | Medium | Network reconnaissance |
-| **DNS** | Domain | Fast | High | Domain enumeration |
-| **Web** | URL | Medium | High | Web app security |
-| **Directory** | URL | Slow | Medium | Content discovery |
-| **SSL** | Host:Port | Fast | High | TLS security |
-| **WordPress** | URL | Medium | Very High | CMS security |
-| **API** | URL/Endpoint | Medium | Very High | API security |
-| **WAF** | URL | Medium | High | WAF analysis |
-
----
-
-## 📈 **Performance Benchmarks**
-
-### **Typical Scan Times**
-- **Port Scan (1000 ports)**: 30-120 seconds
-- **DNS Enumeration**: 1-5 minutes
-- **Web Application Scan**: 5-15 minutes
-- **Directory Enumeration**: 10-30 minutes
-- **SSL Analysis**: 30-60 seconds
-- **WordPress Assessment**: 3-10 minutes
-- **API Security Scan**: 5-15 minutes
-- **WAF Detection**: 1-5 minutes
-
-### **Resource Usage**
-- **Memory**: 100-500MB per scanner
-- **CPU**: Low to moderate usage
-- **Network**: Depends on target responsiveness
-- **Disk**: 10-100MB for results and logs
-
----
-
-## 🔮 **Future Features**
-
-### **Planned Enhancements (Phase 2.3)**
-- **Network Vulnerability Scanner**: Advanced network security testing with Nessus/OpenVAS integration
-- **Enhanced WordPress Integration**: Real-time WPScan execution and CVE database updates
-- **Performance Optimization**: Parallel execution improvements and intelligent caching
-
-### **Advanced Features (Phase 3)**
-- **Interactive HTML Reports**: JavaScript-powered dashboards and data visualization
-- **Machine Learning Engine**: AI-powered vulnerability prioritization and false positive reduction
-- **Enterprise Integration**: REST API, database integration, and SIEM connectivity
-
----
-
-## 📞 **Support and Resources**
-
-### **Documentation**
-- **Installation Guide**: Complete setup instructions
-- **Developer Guide**: Architecture and extension documentation
-- **Troubleshooting Guide**: Common issues and solutions
-- **API Documentation**: Programmatic interface reference
-
-### **Community**
-- **GitHub Repository**: Source code and issue tracking
-- **Documentation**: Online manual and guides
-- **Support**: Community support and discussion
-
-### **Security Considerations**
-- **Responsible Testing**: Follow ethical hacking principles
-- **Legal Compliance**: Ensure proper authorization
-- **Impact Assessment**: Understand testing implications
-- **Coordinated Disclosure**: Report vulnerabilities responsibly
-
----
-
-**Auto-Pentest Framework v0.9.6** - Your comprehensive security assessment platform with 8 integrated scanners including the new WAF Detection Engine! 🚀🛡️
+**Framework Statistics:**
+- **8 Active Scanners** (100% Complete)
+- **5000+ Nuclei Templates** for network vulnerability detection
+- **Multiple Report Formats** (JSON, HTML, PDF)
+- **Enterprise Ready** with professional reporting
+- **Compliance Support** (PCI DSS, OWASP, NIST)

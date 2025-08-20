@@ -5,8 +5,9 @@ Following Single Responsibility Principle
 Updated for Phase 2.3: Network Vulnerability Scanner (Backward Compatible)
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pathlib import Path
+from datetime import datetime
 
 from ..scanners.recon.port_scanner import PortScanner
 from ..scanners.recon.dns_scanner import DNSScanner
@@ -499,20 +500,10 @@ class ScannerService:
     ) -> None:
         """Save scanner results if requested"""
         try:
-            if options.get("output") or options.get("save_raw"):
-                output_dir = Path(options.get("output", "output/reports"))
-                output_dir.mkdir(parents=True, exist_ok=True)
-
-                # Save JSON result
-                json_file = (
-                    output_dir
-                    / f"{scan_type}_{result.target}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.json"
-                )
-                result.save_to_file(json_file)
-                log_info(f"Results saved to: {json_file}")
-
-                # Generate reports if requested
-                if any(
+            if (
+                options.get("output")
+                or options.get("save_raw")
+                or any(
                     options.get(fmt, False)
                     for fmt in [
                         "json_report",
@@ -520,10 +511,281 @@ class ScannerService:
                         "pdf_report",
                         "all_reports",
                     ]
-                ):
-                    self.report_service.generate_scanner_report(
-                        result, scan_type, options
+                )
+            ):
+                output_dir = Path(
+                    options.get("output_dir", options.get("output", "output/reports"))
+                )
+                output_dir.mkdir(parents=True, exist_ok=True)
+
+                # Save JSON result (raw scan data)
+                if options.get("save_raw", True):
+                    json_file = (
+                        output_dir
+                        / f"{scan_type}_{result.target.replace('/', '_').replace(':', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.json"
                     )
+                    result.save_to_file(json_file)
+                    log_info(f"📄 Raw results saved to: {json_file}")
+
+                # Generate formatted reports if requested
+                report_generated = False
+
+                if options.get("json_report") or options.get("all_reports"):
+                    json_report_file = (
+                        output_dir
+                        / f"{scan_type}_report_{result.target.replace('/', '_').replace(':', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.json"
+                    )
+                    self._generate_json_report(result, scan_type, json_report_file)
+                    log_info(f"📊 JSON report saved to: {json_report_file}")
+                    report_generated = True
+
+                if options.get("html_report") or options.get("all_reports"):
+                    html_report_file = (
+                        output_dir
+                        / f"{scan_type}_report_{result.target.replace('/', '_').replace(':', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.html"
+                    )
+                    self._generate_html_report(result, scan_type, html_report_file)
+                    log_info(f"🌐 HTML report saved to: {html_report_file}")
+                    report_generated = True
+
+                if options.get("pdf_report") or options.get("all_reports"):
+                    try:
+                        pdf_report_file = (
+                            output_dir
+                            / f"{scan_type}_report_{result.target.replace('/', '_').replace(':', '_')}_{result.start_time.strftime('%Y%m%d_%H%M%S')}.pdf"
+                        )
+                        self._generate_pdf_report(result, scan_type, pdf_report_file)
+                        log_info(f"📑 PDF report saved to: {pdf_report_file}")
+                        report_generated = True
+                    except Exception as e:
+                        log_warning(f"⚠️ PDF generation failed: {e}")
+                        log_info(
+                            "💡 Install weasyprint or wkhtmltopdf for PDF generation"
+                        )
+
+                if report_generated:
+                    log_success(f"✅ Reports generated in: {output_dir}")
 
         except Exception as e:
             log_error(f"Error saving results: {e}")
+
+    def _generate_json_report(self, result, scan_type: str, output_file: Path) -> None:
+        """Generate formatted JSON report"""
+        try:
+            report_data = {
+                "scan_info": {
+                    "type": scan_type,
+                    "target": result.target,
+                    "scanner": result.scanner_name,
+                    "start_time": result.start_time.isoformat(),
+                    "end_time": (
+                        result.end_time.isoformat() if result.end_time else None
+                    ),
+                    "duration": (
+                        str(result.end_time - result.start_time)
+                        if result.end_time
+                        else None
+                    ),
+                    "status": result.status.value,
+                },
+                "summary": {
+                    "total_findings": len(result.findings),
+                    "severity_breakdown": self._get_severity_breakdown(result.findings),
+                    "unique_vulnerabilities": len(
+                        set(f.get("id", "") for f in result.findings)
+                    ),
+                },
+                "findings": result.findings,
+                "metadata": result.metadata,
+                "errors": result.errors,
+                "generated_at": datetime.now().isoformat(),
+                "generator": "Auto-Pentest Framework v0.9.6",
+            }
+
+            with open(output_file, "w", encoding="utf-8") as f:
+                import json
+
+                json.dump(report_data, f, indent=2, ensure_ascii=False)
+
+        except Exception as e:
+            log_error(f"Failed to generate JSON report: {e}")
+
+    def _generate_html_report(self, result, scan_type: str, output_file: Path) -> None:
+        """Generate HTML report"""
+        try:
+            html_content = self._create_html_report_content(result, scan_type)
+
+            with open(output_file, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+        except Exception as e:
+            log_error(f"Failed to generate HTML report: {e}")
+
+    def _generate_pdf_report(self, result, scan_type: str, output_file: Path) -> None:
+        """Generate PDF report"""
+        try:
+            # First generate HTML
+            html_content = self._create_html_report_content(result, scan_type)
+
+            # Try different PDF libraries
+            try:
+                import weasyprint
+
+                html_doc = weasyprint.HTML(string=html_content)
+                html_doc.write_pdf(str(output_file))
+            except ImportError:
+                try:
+                    import pdfkit
+
+                    pdfkit.from_string(html_content, str(output_file))
+                except ImportError:
+                    raise ImportError(
+                        "Neither weasyprint nor pdfkit available for PDF generation"
+                    )
+
+        except Exception as e:
+            log_error(f"Failed to generate PDF report: {e}")
+            raise
+
+    def _create_html_report_content(self, result, scan_type: str) -> str:
+        """Create HTML report content"""
+        severity_breakdown = self._get_severity_breakdown(result.findings)
+
+        # Calculate risk score
+        risk_score = (
+            severity_breakdown.get("critical", 0) * 10
+            + severity_breakdown.get("high", 0) * 7
+            + severity_breakdown.get("medium", 0) * 4
+            + severity_breakdown.get("low", 0) * 2
+            + severity_breakdown.get("info", 0) * 1
+        )
+
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{scan_type.replace('_', ' ').title()} Report - {result.target}</title>
+    <style>
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }}
+        .container {{ max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }}
+        .header {{ text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2c3e50; padding-bottom: 20px; }}
+        .header h1 {{ color: #2c3e50; margin: 0; font-size: 2.5em; }}
+        .header .subtitle {{ color: #7f8c8d; font-size: 1.2em; margin-top: 10px; }}
+        .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+        .summary-card {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; }}
+        .summary-card h3 {{ margin: 0; font-size: 2em; }}
+        .summary-card p {{ margin: 5px 0 0 0; opacity: 0.9; }}
+        .severity-critical {{ background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%); }}
+        .severity-high {{ background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%); }}
+        .severity-medium {{ background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%); color: #333; }}
+        .severity-low {{ background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%); }}
+        .severity-info {{ background: linear-gradient(135deg, #42a5f5 0%, #2196f3 100%); }}
+        .findings {{ margin-top: 30px; }}
+        .finding {{ background: white; border-left: 5px solid #3498db; margin: 15px 0; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }}
+        .finding.critical {{ border-left-color: #e74c3c; }}
+        .finding.high {{ border-left-color: #f39c12; }}
+        .finding.medium {{ border-left-color: #f1c40f; }}
+        .finding.low {{ border-left-color: #27ae60; }}
+        .finding.info {{ border-left-color: #3498db; }}
+        .finding-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }}
+        .finding-title {{ font-size: 1.3em; font-weight: bold; color: #2c3e50; }}
+        .severity-badge {{ padding: 5px 15px; border-radius: 20px; font-size: 0.8em; font-weight: bold; text-transform: uppercase; }}
+        .severity-badge.critical {{ background: #e74c3c; color: white; }}
+        .severity-badge.high {{ background: #f39c12; color: white; }}
+        .severity-badge.medium {{ background: #f1c40f; color: #333; }}
+        .severity-badge.low {{ background: #27ae60; color: white; }}
+        .severity-badge.info {{ background: #3498db; color: white; }}
+        .finding-details {{ color: #555; line-height: 1.6; }}
+        .metadata {{ background: #ecf0f1; padding: 15px; border-radius: 5px; margin-top: 20px; }}
+        .footer {{ text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #bdc3c7; color: #7f8c8d; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{scan_type.replace('_', ' ').title()} Security Report</h1>
+            <div class="subtitle">Target: {result.target} | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-card">
+                <h3>{len(result.findings)}</h3>
+                <p>Total Findings</p>
+            </div>
+            <div class="summary-card severity-critical">
+                <h3>{severity_breakdown.get('critical', 0)}</h3>
+                <p>Critical</p>
+            </div>
+            <div class="summary-card severity-high">
+                <h3>{severity_breakdown.get('high', 0)}</h3>
+                <p>High</p>
+            </div>
+            <div class="summary-card severity-medium">
+                <h3>{severity_breakdown.get('medium', 0)}</h3>
+                <p>Medium</p>
+            </div>
+            <div class="summary-card severity-low">
+                <h3>{severity_breakdown.get('low', 0)}</h3>
+                <p>Low</p>
+            </div>
+            <div class="summary-card severity-info">
+                <h3>{severity_breakdown.get('info', 0)}</h3>
+                <p>Info</p>
+            </div>
+        </div>
+
+        <div class="findings">
+            <h2>Detailed Findings</h2>
+"""
+
+        # Add findings
+        for i, finding in enumerate(result.findings, 1):
+            severity = finding.get("severity", "info")
+            html_content += f"""
+            <div class="finding {severity}">
+                <div class="finding-header">
+                    <div class="finding-title">{i}. {finding.get('title', 'Security Finding')}</div>
+                    <div class="severity-badge {severity}">{severity}</div>
+                </div>
+                <div class="finding-details">
+                    <p><strong>ID:</strong> {finding.get('id', 'N/A')}</p>
+                    <p><strong>Description:</strong> {finding.get('description', 'No description available')}</p>
+                    <p><strong>Target:</strong> {finding.get('matched_at', 'N/A')}</p>
+                    <p><strong>Recommendation:</strong> {finding.get('recommendation', 'Review and remediate this security issue')}</p>
+                </div>
+            </div>
+"""
+
+        html_content += f"""
+        </div>
+
+        <div class="metadata">
+            <h3>Scan Information</h3>
+            <p><strong>Scanner:</strong> {result.scanner_name}</p>
+            <p><strong>Start Time:</strong> {result.start_time.strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p><strong>End Time:</strong> {result.end_time.strftime('%Y-%m-%d %H:%M:%S') if result.end_time else 'N/A'}</p>
+            <p><strong>Duration:</strong> {str(result.end_time - result.start_time) if result.end_time else 'N/A'}</p>
+            <p><strong>Status:</strong> {result.status.value}</p>
+        </div>
+
+        <div class="footer">
+            <p>Generated by Auto-Pentest Framework v0.9.6 | Network Vulnerability Scanner</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+        return html_content
+
+    def _get_severity_breakdown(self, findings: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Get breakdown of findings by severity"""
+        breakdown = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+
+        for finding in findings:
+            severity = finding.get("severity", "info")
+            if severity in breakdown:
+                breakdown[severity] += 1
+
+        return breakdown

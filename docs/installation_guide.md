@@ -1,9 +1,9 @@
-# Auto-Pentest Framework - Installation Guide
+# Auto-Pentest Framework v0.9.6 - Installation Guide
+**Phase 2.3: Network Vulnerability Scanner Integration Complete**
 
+## 📋 **System Requirements**
 
-### **📋 System Requirements**
-
-#### **Core Dependencies**
+### **Core Dependencies**
 ```bash
 # Network & Web Security Tools
 - nmap (Network scanning)
@@ -11,11 +11,14 @@
 - dirb/gobuster (Directory enumeration)
 - sslscan (SSL/TLS analysis)
 
-# NEW Phase 1.1: CMS Security
+# Phase 1.1: CMS Security
 - wpscan (WordPress security scanner) ⭐
+
+# Phase 2.3: Network Vulnerability Assessment
+- nuclei (Vulnerability scanner with templates) 🚀
 ```
 
-#### **Python Requirements**
+### **Python Requirements**
 - Python 3.8+ (3.9+ recommended)
 - Virtual environment (recommended)
 - PDF generation libraries (optional but recommended)
@@ -34,7 +37,7 @@ cd auto-pentest-framework
 chmod +x install_dependencies.sh
 ./install_dependencies.sh
 
-# Verify installation
+# Verify installation including new Network Scanner
 python3 verify_installation.py
 ```
 
@@ -48,10 +51,31 @@ sudo apt update
 # Install core security tools
 sudo apt install -y nmap nikto dirb gobuster sslscan dnsutils
 
-# Install WPScan (NEW - Phase 1.1)
+# Install WPScan (Phase 1.1)
 sudo apt install -y wpscan
 # OR install via Ruby gem if apt version not available:
 # sudo apt install -y ruby ruby-dev && gem install wpscan
+
+# 🚀 NEW: Install Nuclei (Phase 2.3) - Multiple options:
+
+# Option A: Install from APT (if available)
+sudo apt install -y nuclei
+
+# Option B: Install via Snap
+sudo snap install nuclei
+
+# Option C: Download binary directly (recommended)
+cd /tmp
+wget https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.1.0_linux_amd64.zip
+unzip nuclei_3.1.0_linux_amd64.zip
+sudo mv nuclei /usr/local/bin/
+sudo chmod +x /usr/local/bin/nuclei
+
+# Option D: Install via Go (if Go is installed)
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# Install Nuclei templates
+nuclei -update-templates
 
 # Install PDF generation dependencies (optional)
 sudo apt install -y python3-dev libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 libfribidi0 libfontconfig1
@@ -75,6 +99,17 @@ sudo dnf install -y nmap nikto dirb gobuster sslscan bind-utils
 sudo dnf install -y ruby ruby-devel gcc make
 gem install wpscan
 
+# 🚀 Install Nuclei (Phase 2.3)
+# Download binary
+cd /tmp
+wget https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.1.0_linux_amd64.zip
+unzip nuclei_3.1.0_linux_amd64.zip
+sudo mv nuclei /usr/local/bin/
+sudo chmod +x /usr/local/bin/nuclei
+
+# Install templates
+nuclei -update-templates
+
 # Install Python dependencies
 python3 -m venv venv
 source venv/bin/activate
@@ -91,7 +126,32 @@ pip install weasyprint
 # Install security tools
 brew install nmap nikto dirb gobuster sslscan wpscan
 
+# 🚀 Install Nuclei (Phase 2.3)
+brew install nuclei
+
+# Update templates
+nuclei -update-templates
+
 # Install Python dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install weasyprint
+```
+
+#### **Kali Linux**
+```bash
+# Most tools are pre-installed, just update
+sudo apt update && sudo apt upgrade
+
+# Install missing tools if needed
+sudo apt install -y nuclei wpscan
+
+# Update Nuclei templates
+nuclei -update-templates
+
+# Python setup
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
@@ -101,7 +161,38 @@ pip install weasyprint
 
 ---
 
-## 🔍 **WordPress Scanner Setup**
+## 🚀 **Phase 2.3: Network Vulnerability Scanner Setup**
+
+### **Nuclei Installation Verification**
+```bash
+# Check Nuclei installation
+nuclei -version
+
+# Update templates to latest version
+nuclei -update-templates
+
+# List available templates (optional)
+nuclei -templates-list | head -20
+
+# Test Nuclei with a safe target
+nuclei -target https://httpbin.org/get -severity info
+```
+
+### **Network Scanner Configuration**
+```bash
+# Verify Network Scanner integration
+python3 main.py network --help
+
+# Test Network Scanner functionality
+python3 main.py network https://httpbin.org --templates info --verbose
+
+# Check scanner availability
+python3 main.py info
+```
+
+---
+
+## 🔍 **WordPress Scanner Setup (Phase 1.1)**
 
 ### **WPScan API Token (Recommended)**
 
@@ -109,123 +200,226 @@ For enhanced vulnerability detection, get a free API token:
 
 1. **Register** at [https://wpscan.com/api](https://wpscan.com/api)
 2. **Get your token** (free tier: 25 requests/day)
-3. **Set environment variable**:
+3. **Configure the token:**
    ```bash
-   export WPSCAN_API_TOKEN="your_api_token_here"
+   # Option 1: Environment variable
+   export WPSCAN_API_TOKEN=your_api_token_here
    
-   # Make it permanent
-   echo 'export WPSCAN_API_TOKEN="your_api_token_here"' >> ~/.bashrc
-   source ~/.bashrc
+   # Option 2: Use with command
+   python3 main.py wordpress example.com --wpscan-api-token your_token
    ```
 
-### **Verify WPScan Installation**
+### **WPScan Verification**
 ```bash
-# Check if WPScan is installed
+# Test WPScan installation
 wpscan --version
 
-# Test basic functionality
-wpscan --help
+# Update WPScan database
+wpscan --update
 
-# Test with a WordPress site (with API token)
-wpscan --url https://wordpress.org --api-token $WPSCAN_API_TOKEN
+# Test with framework
+python3 main.py wordpress --help
 ```
 
 ---
 
-## 📚 **Usage Examples**
+## 🧪 **Installation Verification**
 
-### **Basic WordPress Scan**
+### **Complete System Test**
 ```bash
-# Simple WordPress scan
-python3 main.py wordpress example.com
+# Run comprehensive verification
+python3 verify_installation.py
 
-# WordPress scan with all report formats
-python3 main.py wordpress example.com --all-reports
+# Test all scanner components
+python3 main.py info
 
-# WordPress scan with WPScan API token
-python3 main.py wordpress example.com --wpscan-api-token YOUR_TOKEN --all-reports
+# Test individual scanners
+python3 main.py port 127.0.0.1 --ports 22,80,443
+python3 main.py dns google.com
+python3 main.py web https://httpbin.org/get
+python3 main.py ssl https://badssl.com
+
+# 🚀 NEW: Test Network Vulnerability Scanner
+python3 main.py network https://httpbin.org --templates critical
+python3 main.py network 127.0.0.1 --templates info --verbose
+
+# Test WordPress scanner (if WordPress target available)
+python3 main.py wordpress https://wpscanteam.com --plugin-check
+
+# Test report generation
+python3 main.py network https://httpbin.org --all-reports --output-dir test-reports
 ```
 
-### **Advanced WordPress Scanning**
+### **Quick Scanner Test**
 ```bash
-# Comprehensive WordPress security assessment
-python3 main.py wordpress https://blog.example.com \
-  --enumerate-plugins \
-  --enumerate-themes \
-  --enumerate-users \
-  --wpscan-api-token YOUR_TOKEN \
-  --all-reports
+# Quick functionality test
+python3 main.py scan 127.0.0.1 --include-port --ports 22,80,443 --json-report
 
-# Quick enumeration without WPScan
-python3 main.py wordpress example.com \
-  --no-use-wpscan \
-  --html-report
-
-# Custom port and scheme
-python3 main.py wordpress example.com \
-  --scheme http \
-  --port 8080 \
-  --pdf-report
-```
-
-### **Report Generation**
-```bash
-# Generate specific report formats
-python3 main.py wordpress example.com --json-report
-python3 main.py wordpress example.com --html-report  
-python3 main.py wordpress example.com --pdf-report
-python3 main.py wordpress example.com --all-reports
-
-# Custom output directory
-python3 main.py wordpress example.com \
-  --all-reports \
-  --output-dir /path/to/reports
+# Verify all scanners are available
+python3 -c "
+from src.scanners import SCANNER_REGISTRY
+print('📊 Available Scanners:')
+for name, scanner in SCANNER_REGISTRY.items():
+    print(f'  ✅ {name}: {scanner.__name__}')
+print(f'📈 Total: {len(SCANNER_REGISTRY)} scanners')
+"
 ```
 
 ---
 
-## 🔧 **Troubleshooting**
+## 🎯 **Feature Verification by Phase**
 
-### **WPScan Installation Issues**
-
-#### **Problem: `wpscan: command not found`**
+### **Phase 1: Core Features**
 ```bash
-# Solution 1: Install via apt (Ubuntu/Debian)
-sudo apt update && sudo apt install wpscan
+# Port Scanner
+python3 main.py port 127.0.0.1 --ports 22,80,443 --verbose
 
-# Solution 2: Install via Ruby gem
-sudo apt install ruby ruby-dev
-gem install wpscan
+# DNS Scanner  
+python3 main.py dns google.com --verbose
 
-# Solution 3: Add gem binary to PATH
-echo 'export PATH="$HOME/.gem/ruby/$(ruby -e "puts RUBY_VERSION")/bin:$PATH"' >> ~/.bashrc
+# Web Scanner
+python3 main.py web https://httpbin.org/get --verbose
+
+# Directory Scanner
+python3 main.py directory https://httpbin.org --tool dirb --verbose
+
+# SSL Scanner
+python3 main.py ssl https://badssl.com --verbose
+```
+
+### **Phase 1.1: CMS Security**
+```bash
+# WordPress Scanner (requires WordPress target)
+python3 main.py wordpress https://wpscanteam.com --plugin-check --theme-check --verbose
+```
+
+### **Phase 2.1: API Security** 
+```bash
+# API Security Scanner
+python3 main.py api https://httpbin.org --owasp-only --verbose
+```
+
+### **Phase 2.2: WAF Detection**
+```bash
+# WAF Scanner
+python3 main.py waf https://httpbin.org --detection-only --verbose
+```
+
+### **🚀 Phase 2.3: Network Vulnerability Assessment**
+```bash
+# Network Vulnerability Scanner - Basic
+python3 main.py network https://httpbin.org --templates critical --verbose
+
+# Network Scanner - Advanced
+python3 main.py network 127.0.0.1 --templates high --service-analysis --protocol-analysis
+
+# Network Scanner - All templates (comprehensive)
+python3 main.py network httpbin.org --templates all --rate-limit 100 --timeout 300
+
+# Network Scanner with full reporting
+python3 main.py network httpbin.org --templates medium --all-reports --output-dir network-reports
+```
+
+---
+
+## 📊 **Report Generation Verification**
+
+### **Test All Report Formats**
+```bash
+# JSON Reports
+python3 main.py network httpbin.org --json-report
+
+# HTML Reports
+python3 main.py network httpbin.org --html-report
+
+# PDF Reports (requires weasyprint)
+python3 main.py network httpbin.org --pdf-report
+
+# All Report Formats
+python3 main.py network httpbin.org --all-reports --output-dir comprehensive-reports
+
+# Custom Output Directory
+python3 main.py network httpbin.org --all-reports --output-dir ~/security-reports/$(date +%Y%m%d)
+```
+
+---
+
+## 🐛 **Troubleshooting**
+
+### **Nuclei Installation Issues**
+
+#### **Nuclei Not Found**
+```bash
+# Check if nuclei is in PATH
+which nuclei
+whereis nuclei
+
+# Manual installation
+wget https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.1.0_linux_amd64.zip
+unzip nuclei_3.1.0_linux_amd64.zip
+sudo mv nuclei /usr/local/bin/
+sudo chmod +x /usr/local/bin/nuclei
+
+# Add to PATH if needed
+echo 'export PATH=$PATH:/usr/local/bin' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-#### **Problem: WPScan permission errors**
+#### **Template Issues**
 ```bash
-# Install for current user only
-gem install --user-install wpscan
+# Update templates manually
+nuclei -update-templates
 
-# Or use system-wide installation
-sudo gem install wpscan
+# Check templates directory
+ls -la ~/.config/nuclei/
+
+# Force template download
+rm -rf ~/.config/nuclei/nuclei-templates
+nuclei -update-templates
+
+# Test with specific template
+nuclei -target https://httpbin.org/get -t ~/.config/nuclei/nuclei-templates/http/technologies/
 ```
 
-#### **Problem: WPScan API issues**
+#### **Permission Issues**
 ```bash
-# Test API connectivity
-curl -H "Authorization: Token YOUR_API_TOKEN" https://wpscan.com/api/v3/status
+# Fix nuclei permissions
+sudo chmod +x $(which nuclei)
 
-# Verify token is set
-echo $WPSCAN_API_TOKEN
+# Fix template directory permissions
+sudo chown -R $USER:$USER ~/.config/nuclei/
 
-# Set token temporarily
-export WPSCAN_API_TOKEN="your_token"
+# Run with explicit path
+/usr/bin/nuclei -target https://httpbin.org/get -severity info
+```
+
+### **Network Scanner Specific Issues**
+
+#### **Scanner Not Available**
+```bash
+# Check Network Scanner import
+python3 -c "from src.scanners.vulnerability.network_scanner import NetworkScanner; print('✅ Network Scanner OK')"
+
+# Check CLI integration
+python3 main.py network --help
+
+# Check in scanner registry
+python3 -c "from src.scanners import SCANNER_REGISTRY; print('network' in SCANNER_REGISTRY)"
+```
+
+#### **Nuclei Command Issues**
+```bash
+# Test nuclei directly
+nuclei -target https://httpbin.org/get -severity critical -j -silent
+
+# Check nuclei version compatibility
+nuclei -version
+
+# Test with framework debugging
+python3 main.py network httpbin.org --templates critical --verbose --debug
 ```
 
 ### **PDF Generation Issues**
-
-#### **Problem: PDF generation fails**
 ```bash
 # Install WeasyPrint dependencies (Ubuntu/Debian)
 sudo apt install python3-dev libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0 libfribidi0 libfontconfig1
@@ -234,6 +428,9 @@ pip install weasyprint
 # Alternative: Use PDFKit
 sudo apt install wkhtmltopdf
 pip install pdfkit
+
+# Test PDF generation
+python3 -c "import weasyprint; print('✅ WeasyPrint OK')" 2>/dev/null || echo "❌ WeasyPrint missing"
 ```
 
 ### **General Troubleshooting**
@@ -242,114 +439,189 @@ pip install pdfkit
 python3 verify_installation.py
 
 # Check individual components
-python3 -c "from src.scanners.cms.wordpress_scanner import WordPressScanner; print('✓ WordPress scanner OK')"
+python3 -c "from src.scanners.vulnerability.network_scanner import NetworkScanner; print('✓ Network scanner OK')"
 
 # Test CLI integration
-python3 main.py wordpress --help
+python3 main.py network --help
 
 # Check logs for detailed error information
-python3 main.py wordpress example.com --debug
+python3 main.py network httpbin.org --debug --verbose
 ```
 
 ---
 
 ## 🐳 **Docker Support**
 
-### **Using Docker for WPScan**
+### **Using Docker for Nuclei**
 ```bash
-# Pull WPScan Docker image
-docker pull wpscanteam/wpscan
+# Pull Nuclei Docker image
+docker pull projectdiscovery/nuclei
 
-# Use with framework (if WPScan not installed locally)
-docker run -it --rm wpscanteam/wpscan --url https://example.com --enumerate p,t,u
+# Use with framework (if Nuclei not installed locally)
+docker run -it --rm projectdiscovery/nuclei -target https://httpbin.org/get -severity critical
 ```
 
 ### **Framework Docker Build**
 ```dockerfile
 FROM python:3.9-slim
 
-# Install system dependencies including WPScan
+# Install system dependencies including Nuclei
 RUN apt-get update && apt-get install -y \
     nmap nikto dirb gobuster sslscan dnsutils \
-    ruby ruby-dev gcc make \
+    ruby ruby-dev gcc make wget unzip \
     && gem install wpscan \
+    && wget https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.1.0_linux_amd64.zip \
+    && unzip nuclei_3.1.0_linux_amd64.zip \
+    && mv nuclei /usr/local/bin/ \
+    && chmod +x /usr/local/bin/nuclei \
+    && nuclei -update-templates \
     && apt-get clean
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install weasyprint
 
 COPY . .
+RUN python verify_installation.py
+
+# Test all scanners
+RUN python main.py info
+
 ENTRYPOINT ["python", "main.py"]
 ```
 
----
-
-## ✅ **Verification Checklist**
-
-Before using the WordPress scanner, ensure:
-
-- [ ] **WPScan installed**: `wpscan --version` works
-- [ ] **Python dependencies**: `pip install -r requirements.txt` completed
-- [ ] **Project structure**: `python3 verify_installation.py` passes
-- [ ] **CLI integration**: `python3 main.py wordpress --help` shows options
-- [ ] **API token configured**: `echo $WPSCAN_API_TOKEN` shows your token
-- [ ] **PDF generation**: At least one PDF library installed (weasyprint/pdfkit)
-
----
-
-## 🎯 **What's New in Phase 1.1**
-
-### **WordPress Security Scanner Features**
-- ✅ **WordPress Detection**: Intelligent WordPress installation detection
-- ✅ **Version Fingerprinting**: WordPress version identification and vulnerability assessment
-- ✅ **Plugin Enumeration**: Discovery and security analysis of WordPress plugins
-- ✅ **Theme Analysis**: WordPress theme enumeration and security evaluation
-- ✅ **User Enumeration**: WordPress user discovery using multiple techniques
-- ✅ **WPScan Integration**: Full integration with WPScan vulnerability database
-- ✅ **Security Configuration**: Analysis of WordPress security settings
-- ✅ **XML-RPC Testing**: XML-RPC endpoint security assessment
-- ✅ **Professional Reporting**: Multi-format reports (HTML, PDF, JSON, TXT)
-
-### **Enhanced CLI Interface**
-```bash
-# New WordPress-specific command
-python3 main.py wordpress TARGET [OPTIONS]
-
-# Enhanced reporting options
---html-report    # Generate HTML report
---pdf-report     # Generate PDF report  
---all-reports    # Generate all formats
---json-report    # Generate JSON report (default)
+### **Docker Compose for Development**
+```yaml
+version: '3.8'
+services:
+  auto-pentest:
+    build: .
+    volumes:
+      - ./output:/app/output
+      - ./reports:/app/reports
+    environment:
+      - DEBUG=True
+      - OUTPUT_DIR=/app/output
+    command: network httpbin.org --all-reports --output-dir /app/reports
 ```
 
-### **Framework Improvements**
-- ✅ **Scanner Registry**: Dynamic scanner discovery and management
-- ✅ **Workflow Integration**: WordPress scanner integrated into orchestration engine
-- ✅ **Enhanced Error Handling**: Improved error reporting and recovery
-- ✅ **Configuration Management**: WPScan configuration in tools_config.yaml
-- ✅ **Comprehensive Testing**: Full test suite for WordPress scanner
+---
+
+## 🚀 **Production Deployment Considerations**
+
+### **System Resources**
+```bash
+# Recommended minimum resources for Network Scanner:
+# - CPU: 4+ cores (Nuclei can be CPU intensive)
+# - RAM: 8GB+ (for large template sets)
+# - Disk: 10GB+ (for templates and reports)
+# - Network: Stable internet for template updates
+
+# Monitor resource usage during scans
+htop
+iotop
+```
+
+### **Template Management**
+```bash
+# Regular template updates (add to cron)
+0 2 * * * /usr/local/bin/nuclei -update-templates >/dev/null 2>&1
+
+# Custom template directory
+export NUCLEI_TEMPLATES_DIR=/opt/custom-nuclei-templates
+nuclei -t $NUCLEI_TEMPLATES_DIR -target example.com
+```
+
+### **Security Considerations**
+```bash
+# Run framework in restricted environment
+# Limit network access for scanning targets only
+# Use dedicated scanning user account
+sudo useradd -m -s /bin/bash pentest-user
+sudo usermod -aG docker pentest-user  # if using Docker
+
+# Restrict outbound connections (example with iptables)
+sudo iptables -A OUTPUT -p tcp --dport 80,443,22,53 -j ACCEPT
+sudo iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+sudo iptables -A OUTPUT -j DROP
+```
 
 ---
 
-## 🔮 **Coming Next: Phase 1.2**
+## 📈 **Performance Optimization**
 
-The next phase will include:
-- **Drupal Scanner**: Comprehensive Drupal security assessment
-- **Joomla Scanner**: Joomla vulnerability detection and analysis
-- **CMS Auto-Detection**: Intelligent CMS identification
-- **Enhanced Workflows**: Multi-CMS scanning workflows
+### **Nuclei Performance Tuning**
+```bash
+# Optimize for faster scans
+python3 main.py network target.com \
+    --templates critical \
+    --rate-limit 200 \
+    --timeout 5 \
+    --service-analysis
+
+# Optimize for thoroughness
+python3 main.py network target.com \
+    --templates all \
+    --rate-limit 50 \
+    --timeout 30 \
+    --service-analysis \
+    --protocol-analysis
+```
+
+### **System Optimization**
+```bash
+# Increase file descriptor limits
+echo "* soft nofile 65536" | sudo tee -a /etc/security/limits.conf
+echo "* hard nofile 65536" | sudo tee -a /etc/security/limits.conf
+
+# Optimize network settings
+echo 'net.core.rmem_max = 16777216' | sudo tee -a /etc/sysctl.conf
+echo 'net.core.wmem_max = 16777216' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
 
 ---
 
-## 🆘 **Getting Help**
+## 🎯 **Next Steps**
 
-If you encounter issues:
+### **After Installation**
+1. **Read User Manual**: `docs/user_manual.md`
+2. **Review Available Scanners**: `python3 main.py info`
+3. **Test with Safe Targets**: Use `httpbin.org`, `scanme.nmap.org`
+4. **Configure Branding**: Set up custom reports
+5. **Set up Templates**: Customize Nuclei templates for your needs
+6. **Schedule Regular Updates**: Set up cron jobs for template updates
 
-1. **Run verification**: `python3 verify_installation.py`
-2. **Check logs**: Enable debug mode with `--debug` flag
-3. **Update tools**: Ensure all security tools are up to date
-4. **Check dependencies**: Verify all required packages are installed
-5. **API token**: Ensure WPScan API token is properly configured
+### **Advanced Configuration**
+1. **Custom Templates**: Create organization-specific Nuclei templates
+2. **Integration**: Set up API integrations and webhooks
+3. **Automation**: Configure CI/CD pipeline integration
+4. **Monitoring**: Set up performance and health monitoring
+5. **Scaling**: Configure distributed scanning capabilities
 
-For detailed troubleshooting, check the logs in `output/logs/` directory.
+---
+
+## 📞 **Support**
+
+### **Getting Help**
+- **Documentation**: `docs/` directory
+- **Troubleshooting**: `docs/troubleshooting_guide.md`
+- **User Manual**: `docs/user_manual.md`
+- **API Reference**: `docs/api_documentation.md`
+
+### **Common Commands**
+```bash
+# Quick help
+python3 main.py --help
+python3 main.py network --help
+
+# System information
+python3 main.py info
+python3 verify_installation.py
+
+# Test installation
+python3 main.py network httpbin.org --templates info --verbose
+```
+
+**Auto-Pentest Framework v0.9.6 with Network Vulnerability Scanner is now ready for production use!** 🚀🎉

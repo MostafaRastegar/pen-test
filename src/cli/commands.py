@@ -39,6 +39,14 @@ from ..scanners.vulnerability.network_scanner import NetworkScanner
 )
 @click.option("--template-path", help="Custom template path (for --templates custom)")
 @click.option("--timeout", default=600, help="Scan timeout in seconds")
+@click.option("--json-report", is_flag=True, help="Generate JSON report")
+@click.option("--html-report", is_flag=True, help="Generate HTML report")
+@click.option("--pdf-report", is_flag=True, help="Generate PDF report")
+@click.option("--all-reports", is_flag=True, help="Generate all report formats")
+@click.option(
+    "--output-dir", default="output/reports", help="Output directory for reports"
+)
+@click.option("--save-raw", is_flag=True, help="Save raw scan results")
 @common_options
 def network_command(
     target,
@@ -48,6 +56,12 @@ def network_command(
     protocol_analysis,
     template_path,
     timeout,
+    json_report,
+    html_report,
+    pdf_report,
+    all_reports,
+    output_dir,
+    save_raw,
     **kwargs,
 ):
     """Network vulnerability scanning using Nuclei and custom analysis"""
@@ -67,6 +81,19 @@ def network_command(
                 "❌ Network scanning functionality not available in this version."
             )
             sys.exit(1)
+
+        # Add report generation options to kwargs
+        kwargs.update(
+            {
+                "json_report": json_report,
+                "html_report": html_report,
+                "pdf_report": pdf_report,
+                "all_reports": all_reports,
+                "output_dir": output_dir,
+                "save_raw": save_raw
+                or any([json_report, html_report, pdf_report, all_reports]),
+            }
+        )
 
         scanner_service.run_network_scan(
             target,

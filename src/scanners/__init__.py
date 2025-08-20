@@ -1,6 +1,8 @@
 """
-Auto-Pentest Framework Scanner Suite
-Complete scanner module with Phase 1.1 CMS scanner integration
+Auto-Pentest Framework Scanner Suite - Updated for Phase 2.2
+Complete scanner module with WAF Detection Engine integration
+
+File Location: src/scanners/__init__.py
 """
 
 # Reconnaissance scanners
@@ -12,8 +14,15 @@ from .vulnerability.web_scanner import WebScanner
 from .vulnerability.directory_scanner import DirectoryScanner
 from .vulnerability.ssl_scanner import SSLScanner
 
-# Phase 1.1: CMS-Specific Vulnerability Scanners
-from .cms.wordpress_scanner import WordPressScanner
+# CMS-Specific scanners
+from .cms import WordPressScanner
+
+# API Security scanners
+from .api.api_scanner import APISecurityScanner
+
+# Phase 2.2: Security scanners (WAF Detection Engine)
+from .security import WAFScanner
+
 
 # Scanner registry for dynamic loading
 SCANNER_REGISTRY = {
@@ -26,6 +35,10 @@ SCANNER_REGISTRY = {
     "ssl": SSLScanner,
     # CMS scanners
     "wordpress": WordPressScanner,
+    # API Security Scanner
+    "api": APISecurityScanner,
+    # Phase 2.2: Security scanners
+    "waf": WAFScanner,
 }
 
 # Category-based organization
@@ -42,6 +55,13 @@ SCANNERS_BY_CATEGORY = {
     "cms": {
         "wordpress": WordPressScanner,
     },
+    "api": {
+        "api": APISecurityScanner,
+    },
+    # Phase 2.2: New security category
+    "security": {
+        "waf": WAFScanner,
+    },
 }
 
 # Export all scanners
@@ -55,6 +75,10 @@ __all__ = [
     "SSLScanner",
     # CMS
     "WordPressScanner",
+    # API Security
+    "APISecurityScanner",
+    # Phase 2.2: Security
+    "WAFScanner",
     # Registry
     "SCANNER_REGISTRY",
     "SCANNERS_BY_CATEGORY",
@@ -70,7 +94,7 @@ def get_scanner_by_name(name: str):
     Get scanner class by name
 
     Args:
-        name: Scanner name (e.g., 'wordpress', 'web', 'port')
+        name: Scanner name (e.g., 'waf', 'wordpress', 'web', 'port')
 
     Returns:
         Scanner class or None if not found
@@ -83,7 +107,7 @@ def get_scanners_by_category(category: str):
     Get all scanners in a category
 
     Args:
-        category: Category name ('recon', 'vulnerability', 'cms')
+        category: Category name ('recon', 'vulnerability', 'cms', 'api', 'security')
 
     Returns:
         Dict of scanners in category
@@ -93,32 +117,66 @@ def get_scanners_by_category(category: str):
 
 def list_available_scanners():
     """
-    List all available scanners with metadata
+    List all available scanners organized by category
 
     Returns:
-        Dict with scanner information
+        Dict: All scanners organized by category
     """
-    scanners_info = {}
+    return SCANNERS_BY_CATEGORY
+
+
+def get_scanner_info(name: str):
+    """
+    Get detailed information about a specific scanner
+
+    Args:
+        name: Scanner name
+
+    Returns:
+        Dict: Scanner information including capabilities
+    """
+    scanner_class = get_scanner_by_name(name)
+    if scanner_class:
+        try:
+            # Create temporary instance to get info
+            scanner_instance = scanner_class()
+            return scanner_instance.get_capabilities()
+        except Exception:
+            return {
+                "name": name,
+                "status": "error",
+                "message": "Could not get scanner info",
+            }
+
+    return None
+
+
+def validate_scanner_dependencies():
+    """
+    Validate that all scanners have their dependencies available
+
+    Returns:
+        Dict: Validation results for each scanner
+    """
+    validation_results = {}
 
     for category, scanners in SCANNERS_BY_CATEGORY.items():
-        scanners_info[category] = {}
-        for name, scanner_class in scanners.items():
+        validation_results[category] = {}
+
+        for scanner_name, scanner_class in scanners.items():
             try:
-                # Get scanner instance to extract capabilities
-                instance = scanner_class()
-                capabilities = instance.get_capabilities()
-                scanners_info[category][name] = {
-                    "class": scanner_class.__name__,
-                    "name": capabilities.get("name", "Unknown"),
-                    "description": capabilities.get("description", "No description"),
-                    "version": capabilities.get("version", "1.0.0"),
-                    "supported_targets": capabilities.get("supported_targets", []),
-                    "scan_types": capabilities.get("scan_types", []),
+                # Create temporary instance
+                scanner_instance = scanner_class()
+                capabilities = scanner_instance.get_capabilities()
+
+                validation_results[category][scanner_name] = {
+                    "status": "available",
+                    "capabilities": capabilities,
                 }
             except Exception as e:
-                scanners_info[category][name] = {
-                    "class": scanner_class.__name__,
-                    "error": f"Failed to load: {str(e)}",
+                validation_results[category][scanner_name] = {
+                    "status": "error",
+                    "error": str(e),
                 }
 
-    return scanners_info
+    return validation_results

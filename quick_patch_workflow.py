@@ -126,7 +126,7 @@ def test_patched_workflow():
         scan_service = ScanService()
 
         # Test target parsing
-        target = "https://chibino.ir"
+        target = "https://example.com"
         parsed_target = scan_service._validate_and_parse_target(target)
 
         print(f"✅ Target parsed: {parsed_target['host']}")
@@ -170,7 +170,7 @@ def main():
         # Test the patch
         if test_patched_workflow():
             print("\n🎉 Patch successful! You can now run:")
-            print("python main.py quick https://chibino.ir")
+            print("python main.py quick https://example.com")
         else:
             print("\n❌ Patch applied but test failed")
     else:

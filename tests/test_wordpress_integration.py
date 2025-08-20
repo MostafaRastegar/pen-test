@@ -29,7 +29,7 @@ def test_wordpress_scanner_import():
 
     try:
         # Test direct import
-        from src.scanners.cms.wordpress_scanner import WordPressScanner
+        from src.scanners.cms import WordPressScanner
 
         log_success("✅ Direct import successful")
 

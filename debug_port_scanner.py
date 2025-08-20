@@ -18,7 +18,7 @@ def test_target_parsing():
     from src.utils.target_parser import TargetParser
 
     parser = TargetParser()
-    target = "https://chibino.ir"
+    target = "https://example.com"
 
     parsed = parser.parse_target(target)
     print(f"Original: {parsed['original']}")
@@ -41,7 +41,7 @@ def test_port_scanner_direct():
         from src.utils.logger import log_info, log_error
 
         # Test with clean hostname
-        target = "chibino.ir"
+        target = "example.com"
         print(f"Testing port scanner with: {target}")
 
         scanner = PortScanner(timeout=60)
@@ -98,7 +98,7 @@ def test_nmap_command():
         executor = CommandExecutor(timeout=60)
 
         # Test basic nmap command
-        target = "chibino.ir"
+        target = "example.com"
         nmap_cmd = f"nmap -sV -sC -p 80,443,22 {target}"
 
         print(f"Executing: {nmap_cmd}")
@@ -143,7 +143,7 @@ def test_workflow_creation():
         scan_service = ScanService()
 
         # Test target parsing
-        target = "https://chibino.ir"
+        target = "https://example.com"
         parsed_target = scan_service._validate_and_parse_target(target)
 
         print(f"Parsed target: {parsed_target}")

@@ -1,16 +1,13 @@
 """
-CMS Vulnerability Scanners Module
+CMS Scanner Module
+Content Management System vulnerability scanners
 
-This module contains specialized scanners for Content Management Systems:
-- WordPress Scanner (WPScan integration)
-- Drupal Scanner (planned)
-- Joomla Scanner (planned)
+This module contains specialized scanners for various CMS platforms:
+- WordPress Scanner: Comprehensive WordPress security analysis
 """
 
 from .wordpress_scanner import WordPressScanner
 
-__all__ = ["WordPressScanner"]
-
-# Version info
-__version__ = "1.0.0"
-__author__ = "Auto-Pentest Framework"
+__all__ = [
+    "WordPressScanner",
+]

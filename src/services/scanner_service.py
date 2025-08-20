@@ -15,6 +15,7 @@ from ..scanners.vulnerability.ssl_scanner import SSLScanner
 from ..utils.target_parser import TargetParser
 from ..utils.logger import log_info, log_error, log_success
 from ..services.report_service import ReportService
+from ..scanners.security.waf_scanner import WAFScanner
 
 
 class ScannerService:
@@ -229,6 +230,46 @@ class ScannerService:
             log_error(f"❌ SSL scan failed: {e}")
             raise
 
+    def run_waf_scan(
+        self,
+        target: str,
+        aggressive: bool,
+        detection_only: bool,
+        timeout: int,
+        options: Dict[str, Any],
+    ) -> None:
+        """Run WAF detection and bypass testing"""
+        try:
+            log_info(f"🛡️ Starting WAF detection scan on {target}")
+
+            # Parse target
+            parsed_target = self.target_parser.parse_target(target)
+
+            # Configure scanner
+            scanner = WAFScanner(timeout=timeout)
+
+            # Prepare scan options
+            scan_options = {
+                "aggressive": aggressive,
+                "detection_only": detection_only,
+                "verbose": options.get("verbose", False),
+            }
+
+            # Execute scan
+            result = scanner.scan(parsed_target["host"], scan_options)
+
+            # Display results
+            self._display_scanner_results(result, "WAF Detection")
+
+            # Save results if requested
+            self._save_scanner_results(result, "waf", options)
+
+            log_success(f"✅ WAF detection scan completed for {target}")
+
+        except Exception as e:
+            log_error(f"WAF scan failed: {e}")
+            raise
+
     def _display_scanner_results(self, result, scan_type: str) -> None:
         """Display scanner results in a formatted way"""
         if not result or not result.findings:
@@ -250,7 +291,18 @@ class ScannerService:
     def _save_scanner_results(
         self, result, scan_type: str, options: Dict[str, Any]
     ) -> None:
-        """Save scanner results if output is requested"""
+        """Save scanner results with automatic report generation"""
+
+        # Always generate reports for individual scanner commands
+        # Set default output directory if not specified
+        if not options.get("output") and not options.get("save_raw"):
+            # Enable automatic saving with default location
+            options["output"] = "output/reports"
+            options["save_raw"] = True
+            options["json_output"] = True  # Always generate JSON by default
+
+            log_info(f"Auto-generating reports in: {options['output']}")
+
         if not options.get("output") and not options.get("save_raw"):
             return
 
@@ -283,3 +335,4 @@ class ScannerService:
 
         except Exception as e:
             log_error(f"Failed to save {scan_type} results: {e}")
+            # Don't raise exception - continue execution even if reporting fails

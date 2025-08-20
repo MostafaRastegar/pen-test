@@ -18,6 +18,8 @@ from .commands import (
     directory_command,
     ssl_command,
     wordpress_command,  # Phase 1.1: WordPress Scanner
+    api_command,  # Phase 2.1: API Security Scanner
+    waf_command,  # Phase 2.2: WAF Detection Engine - ADD THIS LINE
     version_command,
     cache_stats_command,
     clear_cache_command,
@@ -30,7 +32,7 @@ def create_cli_app():
     """Create and configure the CLI application"""
 
     @click.group()
-    @click.version_option(version="0.9.1")
+    @click.version_option(version="0.9.4")  # Updated version
     @click.option("--debug", is_flag=True, help="Enable debug logging")
     @click.option("--quiet", is_flag=True, help="Quiet mode (minimal output)")
     def cli(debug, quiet):
@@ -40,18 +42,19 @@ def create_cli_app():
         A comprehensive tool for automated security testing and vulnerability assessment
         with professional reporting capabilities including PDF export.
 
-        Phase 1.1 Features:
-        - WordPress security scanning with WPScan integration
-        - CMS-specific vulnerability detection
-        - Plugin and theme enumeration
-        - User enumeration and brute force testing
+        Phase 2.1 Features:
+        - API Security Scanner with OWASP API Top 10 testing
+        - REST API vulnerability assessment
+        - GraphQL security testing
+        - JWT token analysis
+        - Rate limiting assessment
         """
         # Setup logging based on options
         level = "DEBUG" if debug else "WARNING" if quiet else "INFO"
         LoggerSetup.setup_logger(name="auto-pentest", level=level, use_rich=True)
 
         if not quiet:
-            log_banner("Auto-Pentest Framework v0.9.1 - Phase 1.1")
+            log_banner("Auto-Pentest Framework v0.9.4 - Phase 2.1")
 
     # Core scanning commands
     cli.add_command(scan_command, name="scan")
@@ -72,6 +75,11 @@ def create_cli_app():
 
     # Phase 1.1: CMS-specific scanners
     cli.add_command(wordpress_command, name="wordpress")
+
+    # Phase 2.1: API Security Scanner
+    cli.add_command(api_command, name="api")
+
+    cli.add_command(waf_command, name="waf")
 
     # Utility commands
     cli.add_command(cache_stats_command, name="cache-stats")

@@ -19,6 +19,68 @@ from ..utils.target_parser import TargetParser
 from ..utils.logger import log_info, log_error, log_success, log_warning
 from ..utils.reporter import ReportGenerator
 from ..scanners.api.api_scanner import APISecurityScanner
+from ..scanners.vulnerability.network_scanner import NetworkScanner
+
+
+@click.command()
+@click.argument("target")
+@click.option(
+    "--templates",
+    type=click.Choice(["default", "critical", "high", "all", "custom"]),
+    default="default",
+    help="Nuclei template selection",
+)
+@click.option("--rate-limit", default=150, help="Request rate limit per second")
+@click.option(
+    "--service-analysis", is_flag=True, help="Enable network service analysis"
+)
+@click.option(
+    "--protocol-analysis", is_flag=True, help="Enable protocol security analysis"
+)
+@click.option("--template-path", help="Custom template path (for --templates custom)")
+@click.option("--timeout", default=600, help="Scan timeout in seconds")
+@common_options
+def network_command(
+    target,
+    templates,
+    rate_limit,
+    service_analysis,
+    protocol_analysis,
+    template_path,
+    timeout,
+    **kwargs,
+):
+    """Network vulnerability scanning using Nuclei and custom analysis"""
+    try:
+        # Check if NetworkScanner is available
+        if NetworkScanner is None:
+            log_error(
+                "❌ Network Scanner not available. Please ensure all dependencies are installed."
+            )
+            sys.exit(1)
+
+        scanner_service = ScannerService()
+
+        # Check if run_network_scan method exists for backward compatibility
+        if not hasattr(scanner_service, "run_network_scan"):
+            log_error(
+                "❌ Network scanning functionality not available in this version."
+            )
+            sys.exit(1)
+
+        scanner_service.run_network_scan(
+            target,
+            templates,
+            rate_limit,
+            service_analysis,
+            protocol_analysis,
+            template_path,
+            timeout,
+            kwargs,
+        )
+    except Exception as e:
+        log_error(f"Network scan failed: {e}")
+        sys.exit(1)
 
 
 @click.command()

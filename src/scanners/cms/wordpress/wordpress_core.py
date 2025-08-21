@@ -212,17 +212,17 @@ class WordPressCore:
                 cmd.extend(options)
 
             # Execute command
-            result = self.executor.execute_command(cmd)
+            result = self.executor.execute(cmd)
 
-            if result["success"] and result["stdout"]:
+            if result.success and result.stdout:
                 try:
-                    return {"success": True, "data": eval(result["stdout"])}
+                    return {"success": True, "data": eval(result.stdout)}
                 except:
-                    return {"success": True, "data": {"raw_output": result["stdout"]}}
+                    return {"success": True, "data": {"raw_output": result.stdout}}
             else:
                 return {
                     "success": False,
-                    "error": result.get("stderr", "Unknown error"),
+                    "error": getattr(result, "stderr", "Unknown error"),
                 }
 
         except Exception as e:

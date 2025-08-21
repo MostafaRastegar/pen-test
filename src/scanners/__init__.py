@@ -1,6 +1,6 @@
 """
-Auto-Pentest Framework Scanner Suite - Updated for Phase 2.2
-Complete scanner module with WAF Detection Engine integration
+Auto-Pentest Framework Scanner Suite - Updated for Phase 2.3
+Complete scanner module with Network Vulnerability Scanner integration
 
 File Location: src/scanners/__init__.py
 """
@@ -13,6 +13,7 @@ from .recon.dns_scanner import DNSScanner
 from .vulnerability.web_scanner import WebScanner
 from .vulnerability.directory_scanner import DirectoryScanner
 from .vulnerability.ssl_scanner import SSLScanner
+from .vulnerability.network_scanner import NetworkScanner
 
 # CMS-Specific scanners
 from .cms import WordPressScanner
@@ -33,6 +34,7 @@ SCANNER_REGISTRY = {
     "web": WebScanner,
     "directory": DirectoryScanner,
     "ssl": SSLScanner,
+    "network": NetworkScanner,  # Phase 2.3: New Network Vulnerability Scanner
     # CMS scanners
     "wordpress": WordPressScanner,
     # API Security Scanner
@@ -51,6 +53,7 @@ SCANNERS_BY_CATEGORY = {
         "web": WebScanner,
         "directory": DirectoryScanner,
         "ssl": SSLScanner,
+        "network": NetworkScanner,  # Phase 2.3: Added to vulnerability category
     },
     "cms": {
         "wordpress": WordPressScanner,
@@ -58,7 +61,7 @@ SCANNERS_BY_CATEGORY = {
     "api": {
         "api": APISecurityScanner,
     },
-    # Phase 2.2: New security category
+    # Phase 2.2: Security category
     "security": {
         "waf": WAFScanner,
     },
@@ -73,6 +76,7 @@ __all__ = [
     "WebScanner",
     "DirectoryScanner",
     "SSLScanner",
+    "NetworkScanner",  # Phase 2.3: Added to exports
     # CMS
     "WordPressScanner",
     # API Security
@@ -94,7 +98,7 @@ def get_scanner_by_name(name: str):
     Get scanner class by name
 
     Args:
-        name: Scanner name (e.g., 'waf', 'wordpress', 'web', 'port')
+        name: Scanner name (e.g., 'network', 'waf', 'wordpress', 'web', 'port')
 
     Returns:
         Scanner class or None if not found
@@ -133,50 +137,31 @@ def get_scanner_info(name: str):
         name: Scanner name
 
     Returns:
-        Dict: Scanner information including capabilities
+        Dict: Scanner capabilities and information
     """
     scanner_class = get_scanner_by_name(name)
     if scanner_class:
         try:
-            # Create temporary instance to get info
-            scanner_instance = scanner_class()
-            return scanner_instance.get_capabilities()
+            # Create temporary instance to get capabilities
+            scanner = scanner_class()
+            return scanner.get_capabilities()
         except Exception:
-            return {
-                "name": name,
-                "status": "error",
-                "message": "Could not get scanner info",
-            }
-
-    return None
+            return {"error": f"Could not get info for scanner: {name}"}
+    return {"error": f"Scanner not found: {name}"}
 
 
-def validate_scanner_dependencies():
+def is_scanner_available(name: str) -> bool:
     """
-    Validate that all scanners have their dependencies available
+    Check if scanner is available
+
+    Args:
+        name: Scanner name
 
     Returns:
-        Dict: Validation results for each scanner
+        bool: True if scanner is available
     """
-    validation_results = {}
+    return name.lower() in SCANNER_REGISTRY
 
-    for category, scanners in SCANNERS_BY_CATEGORY.items():
-        validation_results[category] = {}
 
-        for scanner_name, scanner_class in scanners.items():
-            try:
-                # Create temporary instance
-                scanner_instance = scanner_class()
-                capabilities = scanner_instance.get_capabilities()
-
-                validation_results[category][scanner_name] = {
-                    "status": "available",
-                    "capabilities": capabilities,
-                }
-            except Exception as e:
-                validation_results[category][scanner_name] = {
-                    "status": "error",
-                    "error": str(e),
-                }
-
-    return validation_results
+# Phase 2.3 update: Network scanner count
+TOTAL_SCANNERS = len(SCANNER_REGISTRY)  # Now 8 scanners (90% → 100% complete)

@@ -1,7 +1,7 @@
 # 🎯 Service Development Strategic Workflow
 ## Auto-Pentest Framework - خط قرمز توسعه پروژه
 
-### 📋 **نسخه**: v1.0 | **تاریخ**: 2024 | **وضعیت**: استراتژیک و غیرقابل تغییر
+### 📋 **نسخه**: v1.1 | **تاریخ**: 2024 | **وضعیت**: به‌روزرسانی شده - Post CLI Refactoring
 ### 📁 **مسیر فایل**: docs/development_guide.md
 
 ---
@@ -14,6 +14,7 @@
 1️⃣ features_roadmap.md          # نقشه راه و برنامه‌ریزی پروژه
 2️⃣ docs/tools-list.md           # ابزارها و پکیج‌های مجاز
 3️⃣ docs/development_guide.md    # این سند راهبردی
+4️⃣ src/cli/README.md           # ✨ جدید: راهنمای CLI Architecture
 ```
 
 #### **Step 0.1: مطالعه نقشه راه پروژه**
@@ -122,13 +123,13 @@ ALLOWED_TOOLS = {
 
 ---
 
-## 🏗️ **ساختار فعلی پروژه - الگوی مرجع**
+## 🏗️ **ساختار فعلی پروژه - الگوی مرجع (Post CLI Refactoring)**
 
-### **Architecture Pattern**
+### **Architecture Pattern (Updated)**
 ```
 CLI (main.py) 
     ↓
-Commands (src/cli/commands.py)
+Commands (src/cli/commands/) ← ✨ ساختار جدید
     ↓
 Services (src/services/)
     ↓
@@ -139,7 +140,24 @@ Scanners (src/scanners/)
 Core Framework (src/core/)
 ```
 
-### **Service Layer Structure**
+### **🆕 CLI Commands Structure**
+```python
+src/cli/
+├── __init__.py                    # ثابت (تغییرات حداقلی)
+├── commands/                      # ✨ دایرکتوری جدید
+│   ├── __init__.py               # لایه سازگاری معکوس
+│   ├── core_commands.py          # فرمان‌های اصلی (scan, quick, full)
+│   ├── info_commands.py          # اطلاعات (info, list-tools, version)
+│   ├── network_commands.py       # شبکه (port, dns, network)
+│   ├── web_commands.py           # وب (web, directory, ssl, api)
+│   ├── cms_commands.py           # CMS (wordpress)
+│   ├── security_commands.py      # امنیت (waf)
+│   └── utility_commands.py       # ابزار (cache-stats, clear-cache)
+├── options.py                     # ✨ بهبود یافته با DRY
+└── commands.py                    # ✨ لایه سازگاری معکوس
+```
+
+### **Service Layer Structure (ثابت)**
 ```python
 src/services/
 ├── __init__.py              # Service exports
@@ -175,169 +193,163 @@ FILE_REFERENCE: features_roadmap.md
 - اولویت آن چقدر است؟
 """
 
-# 2. انتخاب ابزارهای مجاز
-FILE_REFERENCE: docs/tools-list.md
-"""
-بررسی ابزارهای مورد نیاز:
-- کدام Python packages نیاز است؟
-- کدام External tools استفاده می‌شود؟
-- آیا همه در لیست مجاز هستند؟
-- آیا ابزار جدیدی نیاز است؟ (نیاز به تأیید)
-"""
-
-# 3. تعریف مسئولیت Service
-SERVICE_DEFINITION = {
-    "name": "service_name",
-    "roadmap_phase": "Phase X: Description",
-    "priority": "High/Medium/Low",
-    "category": "Core/Business/Utility/Integration",
-    "dependencies": ["existing_service_1", "existing_service_2"],
-    "tools_required": ["tool1", "tool2"],  # از tools-list.md
-    "estimated_effort": "X days/weeks"
+# 2. تطبیق با phase فعلی پروژه
+CURRENT_PHASE_ANALYSIS = {
+    "current_phase": "Phase 3: Enterprise Framework",
+    "feature_phase": "Phase 3: Enterprise Framework",
+    "alignment": "✅ مطابق",
+    "can_proceed": True
 }
 
-# 4. Category Identification بر اساس roadmap
-CATEGORY_MAPPING = {
-    "Core Service": "مدیریت اصلی workflow و scanner ها",
-    "Business Service": "منطق کسب‌وکار اصلی", 
-    "Utility Service": "عملکردهای کمکی و پشتیبانی",
-    "Integration Service": "ادغام با ابزارهای خارجی"
-}
-
-# 5. Backward Compatibility Impact Analysis
-COMPATIBILITY_IMPACT = """
-- آیا تغییری در API های موجود لازم است؟
-- آیا CLI Commands جدید نیاز است؟
-- آیا Configuration جدید لازم است؟
-- آیا Dependencies جدید اضافه می‌شود؟
-"""
-
-# 6. Tools and Dependencies Verification
-TOOLS_VERIFICATION = """
-📋 ابزارهای مورد نیاز (همه باید در tools-list.md باشند):
-□ Python package 1: ✅/❌ در لیست مجاز
-□ Python package 2: ✅/❌ در لیست مجاز  
-□ External tool 1: ✅/❌ در لیست مجاز
-□ External tool 2: ✅/❌ در لیست مجاز
-
-🚨 اگر ابزار جدیدی نیاز است:
-1. درخواست اضافه شدن به tools-list.md
-2. توجیه ضرورت استفاده
-3. تأیید از team lead
-4. بروزرسانی tools-list.md
-"""
+# ❌ اگر feature در phase آینده است، توسعه متوقف می‌شود
 ```
 
-#### **Step 1.2: Interface Design with Standards Compliance**
-```python
-# Template for Service Interface
-from typing import Dict, Any, Optional, List
-from abc import ABC, abstractmethod
+#### **Step 1.2: Tools Analysis with Compliance**
+```bash
+# 1. بررسی ابزارهای مورد نیاز
+FILE_REFERENCE: docs/tools-list.md
 
-# مراجعه به roadmap برای تعیین interface requirements
-class NewServiceInterface(ABC):
-    """
-    Interface definition for new service
-    Based on: features_roadmap.md requirements
-    """
+TOOL_COMPLIANCE_CHECK = {
+    "required_tools": ["specific_tool", "another_tool"],
+    "python_packages": ["package1", "package2"],
+    "external_dependencies": ["external_tool"],
+    "all_approved": True,  # ✅ همه در tools-list.md موجود
+    "approval_status": "Approved"
+}
+
+# ❌ اگر ابزار غیرمجاز نیاز باشد، توسعه متوقف می‌شود
+```
+
+#### **Step 1.3: Interface Design with Verification**
+```python
+# ✅ MANDATORY: Verify all imports before design
+
+# مثال طراحی Interface:
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional
+
+# VERIFY: Classes exist before using
+from ..core.validator import InputValidator  # ✅ src/core/validator.py
+from ..utils.logger import log_info, log_error  # ✅ src/utils/logger.py
+from ..services.report_service import ReportService  # ✅ src/services/report_service.py
+
+class ServiceNameInterface(ABC):
+    """Interface following Interface Segregation Principle"""
     
     @abstractmethod
-    def core_method(self, param: str) -> Dict[str, Any]:
-        """Primary service method"""
+    def primary_operation(self, input_data: str, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Primary service operation"""
         pass
     
     @abstractmethod
-    def validate_input(self, data: Any) -> bool:
-        """Input validation"""
+    def get_service_info(self) -> Dict[str, Any]:
+        """Get service information"""
         pass
-    
-    def get_info(self) -> Dict[str, Any]:
-        """Service information (optional)"""
-        return {
-            "name": self.__class__.__name__, 
-            "version": "1.0",
-            "roadmap_phase": "Phase X",
-            "approved_tools": []  # از tools-list.md
-        }
 ```
 
 ### **Phase 2: Implementation (پیاده‌سازی)**
 
-#### **Step 2.1: Service Implementation**
+#### **Step 2.1: Service Implementation with Standards**
 ```python
-# File: src/services/new_service.py
 """
-New Service Implementation
-Following Single Responsibility and Clean Architecture principles
+Service Name Implementation
+FILE PATH: src/services/service_name.py
+
+Following SOLID, Clean Code, and DRY principles
+With mandatory reporting integration for CLI services
 """
 
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from abc import ABC, abstractmethod
 
-# Internal imports (VERIFY EXISTENCE BEFORE USE)
-from ..core.validator import InputValidator  # ✅ EXISTS: src/core/validator.py
-from ..utils.logger import log_info, log_error, log_success  # ✅ EXISTS: src/utils/logger.py
-from ..services.report_service import ReportService  # ✅ EXISTS: src/services/report_service.py
+# VERIFY ALL IMPORTS EXIST
+from ..core.validator import InputValidator  # ✅ src/core/validator.py
+from ..utils.logger import log_info, log_error, log_success  # ✅ src/utils/logger.py
+from ..services.report_service import ReportService  # ✅ src/services/report_service.py
+
+# Type definitions for clarity (Clean Code)
+ServiceResult = Dict[str, Any]
+ServiceOptions = Optional[Dict[str, Any]]
 
 
-class NewService:
-    """Service for specific functionality"""
+class ServiceName(ServiceNameInterface):
+    """
+    Service implementation following all principles
     
-    def __init__(self):
-        """Initialize service with required dependencies"""
-        self.validator = InputValidator()
-        self.logger = logging.getLogger(f"service.{self.__class__.__name__}")
-        # MANDATORY: Initialize report service for CLI integration
-        self.report_service = ReportService()
-        
-    def primary_operation(self, input_data: str, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    SOLID: Single responsibility for specific functionality
+    Clean Code: Clear names and simple structure
+    DRY: Reuses existing components
+    """
+    
+    def __init__(self, config: ServiceOptions = None):
         """
-        Primary service operation with mandatory reporting capability
+        Initialize with dependency injection (Dependency Inversion Principle)
         
         Args:
-            input_data: Input for processing
-            options: Optional configuration including report format
+            config: Optional service configuration
+        """
+        self.config = config or {}
+        self.validator = InputValidator()  # ✅ VERIFIED: exists
+        self.report_service = ReportService()  # ✅ VERIFIED: exists
+        self.logger = self._setup_logger()
+        
+        # Validate configuration
+        self._validate_configuration()
+    
+    def primary_operation(self, input_data: str, options: ServiceOptions = None) -> ServiceResult:
+        """
+        Primary service operation with full error handling
+        
+        Args:
+            input_data: Input data to process
+            options: Operation options including report preferences
             
         Returns:
-            Dict containing operation results with report_generated flag
+            ServiceResult: Operation result with metadata
             
         Raises:
             ValueError: If input validation fails
-            Exception: If operation fails
+            RuntimeError: If operation fails
         """
+        start_time = datetime.now()
+        
         try:
-            # Input validation (SOLID: Single Responsibility)
+            # Input validation (Single Responsibility)
             if not self.validator.validate_input(input_data):
                 raise ValueError(f"Invalid input: {input_data}")
             
-            # Log operation start
-            log_info(f"Starting {self.__class__.__name__} operation")
+            log_info(f"Starting operation: {self.__class__.__name__}")
             
-            # Execute core logic (DRY: Don't repeat validation)
-            result = self._execute_core_logic(input_data, options or {})
+            # Main operation logic
+            result = self._execute_operation(input_data, options or {})
             
-            # MANDATORY: Generate reports if requested via CLI
-            report_generated = self._handle_report_generation(result, options)
-            result["report_generated"] = report_generated
+            # Generate reports if requested (MANDATORY for CLI services)
+            report_result = self._handle_report_generation(result, options or {})
+            result["report_generated"] = report_result
             
-            # Log success
-            log_success(f"Completed {self.__class__.__name__} operation")
+            # Add metadata
+            result["metadata"] = self._generate_metadata()
+            result["execution_time"] = (datetime.now() - start_time).total_seconds()
             
+            log_success(f"Operation completed: {self.__class__.__name__}")
             return result
             
-        except Exception as e:
-            log_error(f"Failed {self.__class__.__name__} operation: {e}")
+        except ValueError as e:
+            log_error(f"Validation error: {e}")
             raise
+        except Exception as e:
+            log_error(f"Operation failed: {e}")
+            raise RuntimeError(f"Service operation failed: {e}")
     
-    def _execute_core_logic(self, input_data: str, options: Dict[str, Any]) -> Dict[str, Any]:
-        """Core business logic implementation (SOLID: Single Responsibility)"""
+    def _execute_operation(self, input_data: str, options: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the main operation logic (Single Responsibility)"""
         # Implementation specific to service
         return {
             "status": "success",
             "data": input_data,
-            "timestamp": datetime.now().isoformat(),
-            "service_name": self.__class__.__name__
+            "processed": True
         }
     
     def _handle_report_generation(self, result: Dict[str, Any], options: Dict[str, Any]) -> bool:
@@ -352,46 +364,89 @@ class NewService:
             bool: True if reports were generated
         """
         # Check if reports are requested
-        report_formats = []
+        requested_formats = []
         if options.get("json_report"):
-            report_formats.append("json")
+            requested_formats.append("json")
         if options.get("txt_report"):
-            report_formats.append("txt")
+            requested_formats.append("txt")
         if options.get("html_report"):
-            report_formats.append("html")
+            requested_formats.append("html")
         if options.get("all_reports"):
-            report_formats = ["json", "txt", "html"]
+            requested_formats = ["json", "txt", "html"]
         
-        if not report_formats:
-            return False
+        if not requested_formats:
+            return {"generated": False, "formats": []}
         
+        # Generate reports using existing service (DRY)
+        generated_reports = []
+        for format_type in requested_formats:
+            try:
+                # VERIFY: Method exists or use alternative
+                if hasattr(self.report_service, 'generate_service_report'):
+                    report_path = self.report_service.generate_service_report(
+                        service_name=self.__class__.__name__,
+                        result_data=result,
+                        format_type=format_type,
+                        output_dir=options.get("output_dir", "output/reports")
+                    )
+                else:
+                    # Use existing method with adaptation
+                    report_path = self.report_service.generate_report(
+                        result, format_type, options.get("output_dir", "output/reports")
+                    )
+                
+                generated_reports.append({
+                    "format": format_type,
+                    "path": report_path,
+                    "size": self._get_file_size(report_path)
+                })
+                
+            except Exception as e:
+                log_error(f"Failed to generate {format_type} report: {e}")
+        
+        return {
+            "generated": len(generated_reports) > 0,
+            "formats": [r["format"] for r in generated_reports],
+            "files": generated_reports
+        }
+    
+    def _validate_configuration(self) -> None:
+        """Validate service configuration (Single Responsibility)"""
+        # Validate config structure
+        if not isinstance(self.config, dict):
+            raise ValueError("Configuration must be a dictionary")
+    
+    def _setup_logger(self) -> logging.Logger:
+        """Setup service logger (Single Responsibility)"""
+        return logging.getLogger(f"service.{self.__class__.__name__}")
+    
+    def _generate_metadata(self) -> Dict[str, Any]:
+        """Generate operation metadata (Single Responsibility)"""
+        return {
+            "service_name": self.__class__.__name__,
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0"
+        }
+    
+    def _get_file_size(self, file_path: str) -> int:
+        """Get file size helper (Clean Code: Descriptive name)"""
         try:
-            # Use existing ReportService (DRY principle)
-            for format_type in report_formats:
-                self.report_service.generate_service_report(
-                    service_name=self.__class__.__name__,
-                    result_data=result,
-                    format_type=format_type,
-                    output_dir=options.get("output_dir", "output/reports")
-                )
-            
-            log_success(f"Generated reports in formats: {', '.join(report_formats)}")
-            return True
-            
-        except Exception as e:
-            log_error(f"Report generation failed: {e}")
-            # Don't fail the main operation due to report issues
-            return False
+            from pathlib import Path
+            return Path(file_path).stat().st_size
+        except:
+            return 0
     
     def get_service_info(self) -> Dict[str, Any]:
-        """Get service information"""
+        """Get service information (Interface Segregation)"""
         return {
             "name": self.__class__.__name__,
             "version": "1.0.0",
+            "description": "Service description",
             "capabilities": ["primary_operation"],
             "dependencies": ["InputValidator", "ReportService"],
             "report_formats": ["json", "txt", "html"],
-            "cli_integration": True
+            "cli_integration": True,
+            "follows_principles": ["SOLID", "Clean Code", "DRY"]
         }
 ```
 
@@ -421,31 +476,68 @@ __all__ = [
 ]
 ```
 
-### **Phase 3: Integration (ادغام)**
+### **Phase 3: CLI Integration (Post-Refactoring)**
 
-#### **Step 3.1: CLI Integration**
+#### **Step 3.1: تعیین فایل مناسب برای Command**
 ```python
-# File: src/cli/commands.py - Add new command
+# ✨ تحلیل ماهیت Command
+COMMAND_CATEGORIZATION = {
+    # Core workflow commands
+    "scan_related": "src/cli/commands/core_commands.py",
+    
+    # Information and system commands  
+    "info_related": "src/cli/commands/info_commands.py",
+    
+    # Network security commands
+    "network_related": "src/cli/commands/network_commands.py",
+    
+    # Web application security
+    "web_related": "src/cli/commands/web_commands.py",
+    
+    # CMS-specific security
+    "cms_related": "src/cli/commands/cms_commands.py",
+    
+    # Security analysis (WAF, etc.)
+    "security_related": "src/cli/commands/security_commands.py",
+    
+    # Utility and maintenance
+    "utility_related": "src/cli/commands/utility_commands.py"
+}
+
+# مثال تصمیم‌گیری:
+new_command_analysis = {
+    "command_name": "new_service_command",
+    "purpose": "New service operation", 
+    "category": "utility_related",
+    "target_file": "src/cli/commands/utility_commands.py"
+}
+```
+
+#### **Step 3.2: CLI Command Implementation با Enhanced Options**
+```python
+# File: src/cli/commands/utility_commands.py (بر اساس categorization)
 import click
 import sys
 from ..services.new_service import NewService  # ✅ VERIFY: src/services/new_service.py exists
 from ..utils.logger import log_info, log_error, log_success  # ✅ VERIFY: src/utils/logger.py exists
 
+# ✨ استفاده از enhanced options
+from ..options import (
+    common_options,           # گزینه‌های عمومی
+    reporting_options,        # گزینه‌های گزارش‌گیری کامل
+    scanner_options,          # پیکربندی scanner (در صورت نیاز)
+)
+
 @click.command()
 @click.argument("input_data")
 @click.option("--config", help="Configuration option")
-# MANDATORY: Add report options for all CLI services
-@click.option("--json-report", is_flag=True, help="Generate JSON report")
-@click.option("--txt-report", is_flag=True, help="Generate TXT report") 
-@click.option("--html-report", is_flag=True, help="Generate HTML report")
-@click.option("--all-reports", is_flag=True, help="Generate all report formats")
-@click.option("--output-dir", default="output/reports", help="Output directory for reports")
-@common_options  # ✅ VERIFY: common_options exists in src/cli/options.py
-def new_command(input_data, config, json_report, txt_report, html_report, all_reports, output_dir, **kwargs):
+@reporting_options          # ✨ JSON, HTML, PDF, TXT, CSV
+@common_options            # گزینه‌های عمومی
+def new_command(input_data, config, **kwargs):
     """
     New service command implementation with mandatory reporting
     
-    FILE PATH: src/cli/commands.py
+    FILE PATH: src/cli/commands/utility_commands.py
     """
     try:
         # Initialize service (SOLID: Dependency Injection)
@@ -454,19 +546,17 @@ def new_command(input_data, config, json_report, txt_report, html_report, all_re
         # Prepare options (Clean Code: Clear parameter passing)
         options = {
             "config": config,
-            "json_report": json_report,
-            "txt_report": txt_report,
-            "html_report": html_report,
-            "all_reports": all_reports,
-            "output_dir": output_dir
         }
+        
+        # Add report options from enhanced options
+        options.update(kwargs)  # includes all reporting options
         
         # Execute service operation
         result = service.primary_operation(input_data, options)
         
         # Log operation result
-        if result.get("report_generated"):
-            log_success(f"Operation completed with reports generated in: {output_dir}")
+        if result.get("report_generated", {}).get("generated", False):
+            log_success(f"Operation completed with reports generated")
         else:
             log_success(f"Operation completed: {result['status']}")
         
@@ -476,47 +566,53 @@ def new_command(input_data, config, json_report, txt_report, html_report, all_re
     except Exception as e:
         log_error(f"Command failed: {e}")
         sys.exit(1)
+
+# Update __all__ export
+__all__.append("new_command")
 ```
 
-#### **Step 3.2: Main CLI Registration**
+#### **Step 3.3: به‌روزرسانی commands/__init__.py**
 ```python
-# File: main.py - Add command registration
-# ✅ VERIFY: Import path exists before adding
-from src.cli.commands import new_command  # VERIFY: src/cli/commands.py contains new_command
+# File: src/cli/commands/__init__.py
 
-# Add to click group (VERIFY: cli group exists in main.py)
-cli.add_command(new_command, name="new")
+# Add new import
+from .utility_commands import (
+    cache_stats_command,
+    clear_cache_command,
+    new_command,  # ✨ NEW
+)
 
-# FILE PATH: main.py
+# Conditional availability check
+try:
+    from .utility_commands import new_command
+    NEW_COMMAND_AVAILABLE = True
+except ImportError:
+    new_command = None
+    NEW_COMMAND_AVAILABLE = False
+
+# Update exports
+__all__ = [
+    # ... existing commands
+    "new_command",  # ✨ NEW
+]
+
+# Update availability function
+def get_command_availability():
+    return {
+        # ... existing
+        "new_command": NEW_COMMAND_AVAILABLE,  # ✨ NEW
+    }
 ```
 
-#### **Step 3.3: Report Service Integration**
+#### **Step 3.4: CLI Registration (automatic)**
 ```python
-# File: src/services/report_service.py - Add method if not exists
-# ✅ VERIFY: ReportService class exists before modifying
+# File: src/cli/__init__.py
+# Import automatic through commands/__init__.py
+from .commands import new_command
 
-def generate_service_report(self, 
-                          service_name: str, 
-                          result_data: Dict[str, Any], 
-                          format_type: str,
-                          output_dir: str = "output/reports") -> str:
-    """
-    Generate report for service operation (MANDATORY for CLI services)
-    
-    Args:
-        service_name: Name of the service
-        result_data: Service operation results
-        format_type: Report format (json, txt, html, pdf)
-        output_dir: Output directory path
-        
-    Returns:
-        str: Path to generated report file
-        
-    FILE PATH: src/services/report_service.py
-    """
-    # Implementation following existing patterns in ReportService
-    # (DRY: Reuse existing report generation logic)
-    pass
+# Conditional registration (backward compatibility)
+if new_command and NEW_COMMAND_AVAILABLE:
+    cli.add_command(new_command, name="new")
 ```
 
 ### **Phase 4: Testing (تست)**
@@ -541,7 +637,7 @@ class TestNewService(unittest.TestCase):
         
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["data"], "test_input")
-        self.assertIn("timestamp", result)
+        self.assertIn("timestamp", result["metadata"])
     
     def test_primary_operation_invalid_input(self):
         """Test invalid input handling"""
@@ -560,12 +656,47 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-#### **Step 4.2: Integration Tests**
+#### **Step 4.2: CLI Integration Tests**
+```python
+# File: tests/cli/test_new_command.py
+import pytest
+from click.testing import CliRunner
+from src.cli.commands.utility_commands import new_command
+
+class TestNewCommand:
+    """Test suite for new CLI command"""
+    
+    def setup_method(self):
+        """Set up test environment"""
+        self.runner = CliRunner()
+    
+    def test_command_help(self):
+        """Test command help output"""
+        result = self.runner.invoke(new_command, ['--help'])
+        assert result.exit_code == 0
+        assert "New service command" in result.output
+    
+    def test_command_execution(self):
+        """Test command execution"""
+        result = self.runner.invoke(new_command, ['test_input'])
+        assert result.exit_code == 0
+    
+    def test_report_options(self):
+        """Test report generation options"""
+        result = self.runner.invoke(new_command, [
+            'test_input', 
+            '--json-report',
+            '--output-dir', '/tmp/test'
+        ])
+        assert result.exit_code == 0
+```
+
+#### **Step 4.3: Integration Tests**
 ```python
 # File: tests/integration/test_new_service_integration.py
 import unittest
 from src.services.new_service import NewService
-from src.cli.commands import new_command
+from src.cli.commands.utility_commands import new_command
 
 class TestNewServiceIntegration(unittest.TestCase):
     """Integration tests for NewService"""
@@ -681,558 +812,97 @@ class ExistingService:
 #### **Step 3.1: Regression Testing**
 ```python
 # File: tests/regression/test_service_changes.py
-class TestServiceRegression(unittest.TestCase):
-    """Regression tests for service changes"""
+class TestServiceChanges(unittest.TestCase):
+    """Regression tests for service modifications"""
     
-    def test_backward_compatibility(self):
-        """Test that old usage still works"""
-        service = ModifiedService()
-        
+    def test_old_api_still_works(self):
+        """Test that old API calls still function"""
         # Test old method calls
-        old_result = service.old_method("test")
-        new_result = service.new_method("test")
-        
-        # Verify compatibility
-        self.assertEqual(old_result["core_data"], new_result["core_data"])
+        # Verify old return formats
+        # Check backward compatibility
+        pass
     
-    def test_enhanced_functionality(self):
-        """Test new functionality"""
-        service = ModifiedService()
-        
+    def test_new_functionality(self):
+        """Test new functionality works correctly"""
         # Test new features
-        result = service.new_method("test", enhanced_param="enhanced")
-        self.assertIn("enhanced_feature", result)
-```
-
-#### **Step 3.2: Integration Validation**
-```bash
-# Run comprehensive test suite
-python -m pytest tests/ -v --tb=short
-
-# Specific regression tests
-python -m pytest tests/regression/ -v
-
-# Integration tests  
-python -m pytest tests/integration/ -v
-
-# Performance tests (if applicable)
-python -m pytest tests/performance/ -v
+        # Verify enhanced capabilities
+        # Check performance improvements
+        pass
 ```
 
 ---
 
-## 🧪 **Testing Strategy (استراتژی تست)**
+## 🆕 **روال اضافه کردن CLI Command جدید (Post-Refactoring)**
 
-### **Test Categories**
+### **Phase 1: Command Analysis & File Selection**
 
-#### **1. Unit Tests (تست واحد)**
+#### **Step 1.1: تعیین فایل مناسب برای Command**
 ```python
-# Test individual service methods
-class TestServiceUnit(unittest.TestCase):
-    def test_core_functionality(self):
-        """Test core service logic"""
-        pass
-    
-    def test_input_validation(self):
-        """Test input validation logic"""
-        pass
-    
-    def test_error_handling(self):
-        """Test error scenarios"""
-        pass
+# بر اساس COMMAND_CATEGORIZATION که قبلاً تعریف شد
+# انتخاب فایل مناسب بر اساس ماهیت command
 ```
 
-#### **2. Integration Tests (تست ادغام)**
+### **Phase 2: Enhanced Options Implementation**
+
+#### **Step 2.1: استفاده از Enhanced Options**
 ```python
-# Test service interactions
-class TestServiceIntegration(unittest.TestCase):
-    def test_service_collaboration(self):
-        """Test multiple services working together"""
-        pass
-    
-    def test_cli_integration(self):
-        """Test CLI command integration"""
-        pass
-    
-    def test_orchestrator_integration(self):
-        """Test orchestrator workflow integration"""
-        pass
+# در src/cli/options.py بهبود یافته:
+
+@common_options          # گزینه‌های پایه
+@reporting_options       # JSON, HTML, PDF, TXT, CSV reports
+@scanner_options         # timeout, threads, rate-limit, user-agent, proxy
+@network_options         # ports, scan-type, fast, service-detection
+@web_options            # scan-depth, max-pages, follow-redirects
+@dns_options            # subdomain-enum, zone-transfer, dns-bruteforce
+@ssl_options            # check-cert, check-protocols, check-ciphers
+@api_options            # swagger-url, api-format, auth-header
+
+# Composite options
+@full_scan_options      # همه گزینه‌ها
+@network_scan_options   # ترکیب network + dns + reporting
+@web_scan_options       # ترکیب web + ssl + reporting
 ```
 
-#### **3. System Tests (تست سیستم)**
+#### **Step 2.2: Options Validation**
 ```python
-# Test complete workflows
-class TestSystemWorkflow(unittest.TestCase):
-    def test_complete_scan_workflow(self):
-        """Test end-to-end scan execution"""
-        pass
-    
-    def test_multi_service_workflow(self):
-        """Test complex multi-service workflows"""
-        pass
-```
+from ..options import validate_option_combination
 
-#### **4. Performance Tests (تست عملکرد)**
-```python
-# Test performance characteristics
-class TestServicePerformance(unittest.TestCase):
-    def test_response_time(self):
-        """Test service response time"""
-        pass
-    
-    def test_memory_usage(self):
-        """Test memory consumption"""
-        pass
-    
-    def test_concurrent_access(self):
-        """Test concurrent service usage"""
-        pass
-```
-
-### **Test Execution Workflow**
-```bash
-# 1. Pre-commit tests (fast)
-python -m pytest tests/unit/ -v --tb=short
-
-# 2. Integration tests  
-python -m pytest tests/integration/ -v
-
-# 3. Full test suite
-python -m pytest tests/ -v --cov=src --cov-report=html
-
-# 4. Performance validation
-python -m pytest tests/performance/ -v --benchmark-only
+def command_function(**kwargs):
+    # Validate option combination
+    if not validate_option_combination(kwargs):
+        log_error("❌ Invalid option combination")
+        sys.exit(1)
 ```
 
 ---
 
-## 📝 **Code Standards (استانداردهای کدنویسی)**
+## 🔄 **روال تغییر Command موجود (Post-Refactoring)**
 
-### **SOLID Principles Implementation**
+### **File Location & Modification**
 ```python
-# S - Single Responsibility Principle
-class UserValidator:  # Only validates users
-    def validate_user(self, user_data): pass
+# یافتن فایل مربوطه
+COMMAND_LOCATIONS = {
+    "scan_command": "src/cli/commands/core_commands.py",
+    "port_command": "src/cli/commands/network_commands.py", 
+    "web_command": "src/cli/commands/web_commands.py",
+    "info_command": "src/cli/commands/info_commands.py",
+    "wordpress_command": "src/cli/commands/cms_commands.py",
+    "waf_command": "src/cli/commands/security_commands.py",
+    # ... و غیره
+}
 
-class UserRepository:  # Only handles user data storage
-    def save_user(self, user): pass
-
-# O - Open/Closed Principle  
-class ReportGenerator:
-    def generate(self, data, formatter): 
-        return formatter.format(data)
-
-class JSONFormatter:  # New formats can be added without modifying ReportGenerator
-    def format(self, data): return json.dumps(data)
-
-# L - Liskov Substitution Principle
-class Scanner(ABC):
-    @abstractmethod
-    def scan(self, target): pass
-
-class PortScanner(Scanner):  # Can replace Scanner without breaking code
-    def scan(self, target): return "port scan result"
-
-# I - Interface Segregation Principle
-class Scannable(ABC):  # Small, focused interface
-    @abstractmethod
-    def scan(self, target): pass
-
-class Reportable(ABC):  # Separate interface for reporting
-    @abstractmethod
-    def generate_report(self): pass
-
-# D - Dependency Inversion Principle
-class ScanService:
-    def __init__(self, scanner: Scannable, reporter: Reportable):  # Depend on abstractions
-        self.scanner = scanner
-        self.reporter = reporter
+# ویرایش در فایل مناسب
+# FILE: src/cli/commands/network_commands.py
+def port_command(...):  # تغییر در فایل مربوطه
+    # Enhanced implementation
 ```
 
-### **DRY Principle Implementation**
+### **Backward Compatibility Verification**
 ```python
-# BAD: Code repetition
-def validate_ip_input(ip):
-    if not ip or not isinstance(ip, str):
-        raise ValueError("Invalid IP")
-    # IP validation logic...
-
-def validate_domain_input(domain):
-    if not domain or not isinstance(domain, str):
-        raise ValueError("Invalid domain")
-    # Domain validation logic...
-
-# GOOD: DRY implementation
-def _validate_string_input(value, input_type):
-    if not value or not isinstance(value, str):
-        raise ValueError(f"Invalid {input_type}")
-
-def validate_ip_input(ip):
-    _validate_string_input(ip, "IP")
-    # IP-specific validation...
-
-def validate_domain_input(domain):
-    _validate_string_input(domain, "domain")
-    # Domain-specific validation...
-```
-
-### **Clean Code Principles**
-```python
-# Clean, readable, and simple code
-class ServiceName:
-    def __init__(self, config: ServiceOptions = None):
-        # VERIFY: All imports exist before use
-        self.validator = InputValidator()  # ✅ EXISTS: src/core/validator.py
-        self.logger = self._setup_logger()  # ✅ Private method defined below
-        self.report_service = ReportService()  # ✅ EXISTS: src/services/report_service.py
-    
-    def process_data(self, input_data: str, options: ServiceOptions = None) -> ServiceResult:
-        """
-        Process data with clear, descriptive method name
-        
-        FILE PATH: src/services/service_name.py
-        """
-        # Clean Code: Early return for edge cases
-        if not input_data:
-            return {"status": "error", "message": "No input provided"}
-        
-        # Clean Code: Clear variable names
-        validation_result = self._validate_input(input_data)
-        if not validation_result.is_valid:
-            return {"status": "error", "message": validation_result.error}
-        
-        # Clean Code: Single responsibility per method
-        processed_data = self._process_core_logic(input_data)
-        report_path = self._generate_reports_if_requested(processed_data, options)
-        
-        return {
-            "status": "success",
-            "data": processed_data,
-            "report_generated": report_path is not None
-        }
-    
-    def _validate_input(self, data: str) -> ValidationResult:
-        """Single responsibility: only validation"""
-        # VERIFY: ValidationResult class exists or define it
-        pass
-    
-    def _process_core_logic(self, data: str) -> Dict[str, Any]:
-        """Single responsibility: only core processing"""
-        pass
-    
-    def _generate_reports_if_requested(self, data: Dict, options: ServiceOptions) -> Optional[str]:
-        """Single responsibility: only report generation"""
-        pass
-    
-    def _setup_logger(self) -> logging.Logger:
-        """Single responsibility: logger setup"""
-        return logging.getLogger(f"service.{self.__class__.__name__}")
-```
-
-### **Method/Class Existence Verification**
-```python
-"""
-MANDATORY: Verify existence before use
-✅ = Verified to exist
-❌ = Does not exist - must create or find alternative
-⚠️  = Exists but needs verification of specific method
-"""
-
-# Core imports verification
-from ..core.validator import InputValidator  # ✅ EXISTS: src/core/validator.py
-from ..core.scanner_base import ScannerBase  # ✅ EXISTS: src/core/scanner_base.py
-from ..utils.logger import log_info, log_error  # ✅ EXISTS: src/utils/logger.py
-
-# Service imports verification  
-from ..services.report_service import ReportService  # ✅ EXISTS: src/services/report_service.py
-from ..services.scan_service import ScanService  # ✅ EXISTS: src/services/scan_service.py
-
-# Method existence verification
-report_service = ReportService()
-# ⚠️  VERIFY: Does ReportService have generate_service_report method?
-# If not, add it following existing patterns
-
-scanner_service = ScannerService() 
-# ✅ VERIFIED: ScannerService exists with standard methods
-
-# Before using any method, verify it exists:
-if hasattr(report_service, 'generate_service_report'):
-    report_service.generate_service_report(data)
-else:
-    # Use existing method or implement new one
-    report_service.generate_report(data)
-```
-
-### **Service Structure Template with All Requirements**
-```python
-"""
-Service Name Implementation
-FILE PATH: src/services/service_name.py
-
-Following SOLID, Clean Code, and DRY principles
-With mandatory reporting integration for CLI services
-"""
-
-import logging
-from typing import Dict, Any, Optional, List
-from datetime import datetime
-from abc import ABC, abstractmethod
-
-# VERIFY ALL IMPORTS EXIST
-from ..core.validator import InputValidator  # ✅ src/core/validator.py
-from ..utils.logger import log_info, log_error, log_success  # ✅ src/utils/logger.py
-from ..services.report_service import ReportService  # ✅ src/services/report_service.py
-
-# Type definitions for clarity (Clean Code)
-ServiceResult = Dict[str, Any]
-ServiceOptions = Optional[Dict[str, Any]]
-
-
-class ServiceNameInterface(ABC):
-    """Interface following Interface Segregation Principle"""
-    
-    @abstractmethod
-    def primary_operation(self, input_data: str, options: ServiceOptions = None) -> ServiceResult:
-        """Primary service operation"""
-        pass
-
-
-class ServiceName(ServiceNameInterface):
-    """
-    Service implementation following all principles
-    
-    SOLID: Single responsibility for specific functionality
-    Clean Code: Clear names and simple structure
-    DRY: Reuses existing components
-    """
-    
-    def __init__(self, config: ServiceOptions = None):
-        """
-        Initialize with dependency injection (Dependency Inversion Principle)
-        
-        Args:
-            config: Optional service configuration
-        """
-        # SOLID: Depend on abstractions, not concretions
-        self.config = config or {}
-        self.validator = InputValidator()  # ✅ VERIFIED EXISTS
-        self.logger = self._setup_logger()  # Single responsibility method
-        self.report_service = ReportService()  # ✅ VERIFIED EXISTS
-        
-        # Validate configuration on initialization
-        self._validate_configuration()
-    
-    def primary_operation(self, 
-                         input_data: str, 
-                         options: ServiceOptions = None) -> ServiceResult:
-        """
-        Main service operation with reporting (MANDATORY for CLI services)
-        
-        Args:
-            input_data: Data to process
-            options: Processing options including report preferences
-            
-        Returns:
-            ServiceResult with status, data, and report info
-            
-        Raises:
-            ValueError: If input validation fails
-            RuntimeError: If processing fails
-        """
-        try:
-            # Clean Code: Early validation
-            self._validate_input(input_data)
-            
-            # Log start (DRY: Use centralized logging)
-            log_info(f"Starting {self.__class__.__name__} operation")
-            
-            # Process data (Single Responsibility)
-            result_data = self._process_data(input_data, options)
-            
-            # Generate reports if requested (MANDATORY for CLI)
-            report_info = self._handle_reporting(result_data, options)
-            
-            # Combine results (Clean Code: Clear structure)
-            final_result = {
-                "status": "success",
-                "data": result_data,
-                "metadata": self._generate_metadata(),
-                "reports": report_info
-            }
-            
-            log_success(f"Completed {self.__class__.__name__} operation")
-            return final_result
-            
-        except Exception as e:
-            log_error(f"Operation failed: {e}")
-            raise
-    
-    def _validate_input(self, input_data: str) -> None:
-        """Validate input data (Single Responsibility)"""
-        if not input_data or not isinstance(input_data, str):
-            raise ValueError("Invalid input data")
-        
-        # Use existing validator (DRY principle)
-        if hasattr(self.validator, 'validate_string'):  # ✅ VERIFY method exists
-            if not self.validator.validate_string(input_data):
-                raise ValueError("Input validation failed")
-    
-    def _process_data(self, input_data: str, options: ServiceOptions) -> Dict[str, Any]:
-        """Core data processing (Single Responsibility)"""
-        # Implementation specific to service
-        # Following Clean Code: descriptive variable names
-        processed_result = {
-            "original_input": input_data,
-            "processed_at": datetime.now().isoformat(),
-            "processing_options": options or {}
-        }
-        return processed_result
-    
-    def _handle_reporting(self, data: Dict[str, Any], options: ServiceOptions) -> Dict[str, Any]:
-        """Handle report generation (MANDATORY for CLI services)"""
-        if not options:
-            return {"generated": False, "formats": []}
-        
-        # Check report format requests
-        requested_formats = []
-        if options.get("json_report"):
-            requested_formats.append("json")
-        if options.get("txt_report"):
-            requested_formats.append("txt")
-        if options.get("html_report"):
-            requested_formats.append("html")
-        if options.get("all_reports"):
-            requested_formats = ["json", "txt", "html"]
-        
-        if not requested_formats:
-            return {"generated": False, "formats": []}
-        
-        # Generate reports using existing service (DRY)
-        generated_reports = []
-        for format_type in requested_formats:
-            try:
-                # VERIFY: Method exists or use alternative
-                if hasattr(self.report_service, 'generate_service_report'):
-                    report_path = self.report_service.generate_service_report(
-                        service_name=self.__class__.__name__,
-                        result_data=data,
-                        format_type=format_type,
-                        output_dir=options.get("output_dir", "output/reports")
-                    )
-                else:
-                    # Use existing method with adaptation
-                    report_path = self.report_service.generate_report(
-                        data, format_type, options.get("output_dir", "output/reports")
-                    )
-                
-                generated_reports.append({
-                    "format": format_type,
-                    "path": report_path,
-                    "size": self._get_file_size(report_path)
-                })
-                
-            except Exception as e:
-                log_error(f"Failed to generate {format_type} report: {e}")
-        
-        return {
-            "generated": len(generated_reports) > 0,
-            "formats": [r["format"] for r in generated_reports],
-            "files": generated_reports
-        }
-    
-    def _validate_configuration(self) -> None:
-        """Validate service configuration (Single Responsibility)"""
-        # Validate config structure
-        if not isinstance(self.config, dict):
-            raise ValueError("Configuration must be a dictionary")
-    
-    def _setup_logger(self) -> logging.Logger:
-        """Setup service logger (Single Responsibility)"""
-        return logging.getLogger(f"service.{self.__class__.__name__}")
-    
-    def _generate_metadata(self) -> Dict[str, Any]:
-        """Generate operation metadata (Single Responsibility)"""
-        return {
-            "service_name": self.__class__.__name__,
-            "timestamp": datetime.now().isoformat(),
-            "version": "1.0.0"
-        }
-    
-    def _get_file_size(self, file_path: str) -> int:
-        """Get file size helper (Clean Code: Descriptive name)"""
-        try:
-            from pathlib import Path
-            return Path(file_path).stat().st_size
-        except:
-            return 0
-    
-    def get_service_info(self) -> Dict[str, Any]:
-        """Get service information (Interface Segregation)"""
-        return {
-            "name": self.__class__.__name__,
-            "version": "1.0.0",
-            "description": "Service description",
-            "capabilities": ["primary_operation"],
-            "dependencies": ["InputValidator", "ReportService"],
-            "report_formats": ["json", "txt", "html"],
-            "cli_integration": True,
-            "follows_principles": ["SOLID", "Clean Code", "DRY"]
-        }
-```
-
-### **File Creation and Documentation Requirements**
-```python
-"""
-MANDATORY: File path documentation for every file
-
-When creating/modifying files, always specify:
-1. Complete file path from project root
-2. Purpose of the file
-3. Dependencies and their verification status
-4. Integration points
-
-Example:
-FILE PATH: src/services/vulnerability_assessment_service.py
-PURPOSE: Vulnerability assessment and risk analysis service
-DEPENDENCIES:
-  ✅ src/core/validator.py (InputValidator)
-  ✅ src/utils/logger.py (logging functions)  
-  ✅ src/services/report_service.py (ReportService)
-INTEGRATION: CLI command, orchestrator workflow
-"""
-```
-
-### **Error Handling Standards**
-```python
-# Standard error handling pattern
-try:
-    result = operation()
-except ValidationError as e:
-    log_error(f"Validation failed: {e}")
-    raise ValueError(f"Invalid input: {e}")
-except TimeoutError as e:
-    log_error(f"Operation timeout: {e}")
-    raise RuntimeError(f"Operation timed out: {e}")
-except Exception as e:
-    log_error(f"Unexpected error: {e}")
-    raise RuntimeError(f"Service operation failed: {e}")
-```
-
-### **Logging Standards**
-```python
-from ..utils.logger import log_info, log_error, log_success, log_warning, log_debug
-
-# Use structured logging
-log_info("Operation started", extra={
-    "service": self.__class__.__name__,
-    "method": "method_name",
-    "target": target_param
-})
-
-log_success("Operation completed", extra={
-    "duration": end_time - start_time,
-    "result_count": len(results)
-})
+# اطمینان از عدم شکستن imports موجود
+# این import ها باید همچنان کار کنند:
+from src.cli.commands import port_command          # ✅ از طریق __init__.py
+from src.cli.commands.network_commands import port_command  # ✅ مستقیم
 ```
 
 ---
@@ -1247,73 +917,43 @@ log_success("Operation completed", extra={
 - [ ] Documentation updated
 - [ ] Backward compatibility verified
 
-# 2. Roadmap Compliance
-- [ ] Feature matches roadmap specification (features_roadmap.md)
-- [ ] Phase requirements satisfied
-- [ ] Dependencies properly handled
-- [ ] Priority alignment confirmed
-
-# 3. Tools Compliance  
-- [ ] All tools verified against docs/tools-list.md
-- [ ] No unauthorized packages used
-- [ ] Tool versions compatible
-- [ ] External tools properly configured
-
-# 4. Performance Validation
-- [ ] Performance tests passed
-- [ ] Memory usage acceptable
-- [ ] Response time within limits
-- [ ] Resource usage optimized
-
-# 5. Integration Validation  
-- [ ] CLI integration working
-- [ ] Service interactions validated
-- [ ] Configuration compatibility verified
-- [ ] Report generation functional
-
-# 6. Documentation Compliance
-- [ ] API documentation updated
-- [ ] User manual updated
-- [ ] Migration guide created (if needed)
-- [ ] File paths documented
-- [ ] Roadmap status updated
-```
-
-### **Deployment Steps with Compliance Checks**
-```bash
-# 1. Pre-deployment compliance verification
-echo "🔍 Verifying roadmap compliance..."
+# 2. Compliance Check
 python -c "
 import sys
 sys.path.append('.')
-# Verify service matches roadmap requirements
-print('✅ Roadmap compliance verified')
+
+# Check roadmap compliance
+print('📋 Checking roadmap compliance...')
+# Verify feature is in approved roadmap
+
+# Check tools compliance  
+print('🛠️ Checking tools compliance...')
+# Verify all tools are in approved list
+
+# Check method verification
+print('⚙️ Checking method verification...')
+# Verify all imported methods exist
+
+print('✅ All compliance checks passed')
 "
 
-echo "🔍 Verifying tools compliance..."
-python -c "
-# Verify only approved tools are used
-# Reference: docs/tools-list.md
-print('✅ Tools compliance verified')
-"
-
-# 2. Backup current version
+# 3. Backup current version
 git tag -a v$(current_version) -m "Pre-deployment backup"
 
-# 3. Deploy new service
+# 4. Deploy new service
 git merge feature/new-service
 
-# 4. Run validation tests
+# 5. Run validation tests
 python -m pytest tests/ -v --tb=short
 
-# 5. Verify CLI functionality
+# 6. Verify CLI functionality
 python main.py --help
 python main.py info
 
-# 6. Test critical workflows
+# 7. Test critical workflows
 python main.py scan test-target --profile quick
 
-# 7. Verify roadmap status update
+# 8. Verify roadmap status update
 echo "📋 Update features_roadmap.md status to 'Completed'"
 ```
 
@@ -1585,67 +1225,14 @@ python main.py new-command input-data --option value
   □ New tools (if any) approved in docs/tools-list.md
   □ Existing tool usage still compliant
   □ Tool version changes documented
-  □ External tool compatibility maintained
+  □ External tool impact evaluated
 
-□ 🔄 COMPATIBILITY & STANDARDS
-  □ Impact analysis completed
-  □ Backward compatibility plan created
-  □ Migration guide written (if needed)
-  □ All modified methods/classes verified to exist
-  □ SOLID principles maintained
-  □ DRY principle enforced
+□ 📚 DEVELOPMENT STANDARDS
+  □ Backward compatibility maintained
+  □ SOLID principles preserved
   □ Clean Code standards upheld
-
-□ 📊 REPORTING & INTEGRATION
-  □ Report integration preserved/enhanced
-  □ CLI functionality maintained
-  □ New report formats added (if applicable)
-  □ Output consistency verified
-
-□ 🧪 VALIDATION & TESTING
-  □ Regression tests implemented
-  □ Integration validation completed
-  □ Performance impact assessed
-  □ Tools compliance verified
-  □ CLI testing completed
-
-□ 📖 DOCUMENTATION & DEPLOYMENT
-  □ File paths for all changes documented
-  □ Documentation updated
-  □ Deprecation notices added (if applicable)
-  □ Code review completed
-  □ Deployment validated
-  □ features_roadmap.md updated if needed
-  □ No breaking changes without approval
-```
-
-### **Code Quality Verification with Standards**
-```bash
-□ 🔍 EXISTENCE VERIFICATION
-  □ All imports verified to exist in project
-  □ Method calls verified against actual class definitions
-  □ No undefined class attributes accessed
-  □ Dependencies verified in current codebase
-
-□ 🏗️ ARCHITECTURE PRINCIPLES
-  □ Single Responsibility Principle applied
-  □ Open/Closed Principle followed
-  □ Liskov Substitution maintained
-  □ Interface Segregation implemented
-  □ Dependency Inversion applied
-
-□ 🧹 CODE QUALITY
-  □ Code duplication eliminated (DRY)
-  □ Method names are descriptive and clear
-  □ Class responsibilities are well-defined
-  □ Error handling is comprehensive
-  □ Logging follows project standards
-  □ Type hints provided for all methods
-
-□ 📁 DOCUMENTATION & PATHS
-  □ File paths documented in comments
-  □ Purpose and dependencies clearly stated
-  □ Integration points documented
+  □ DRY principle not violated
+  □ Method/class verification completed
   □ API documentation complete
 
 □ 🛠️ TOOLS & COMPLIANCE
@@ -1655,8 +1242,20 @@ python main.py new-command input-data --option value
   □ Configuration follows project standards
 ```
 
-### **CLI Service Requirements Checklist**
+### **CLI Service Requirements Checklist (Post-Refactoring)**
 ```bash
+□ 📁 FILE ORGANIZATION
+  □ Command در فایل مناسب قرار گرفته (core/info/network/web/cms/security/utility)
+  □ Import statements در فایل صحیح هستند
+  □ __all__ exports به‌روزرسانی شده
+  □ commands/__init__.py به‌روزرسانی شده
+
+□ 🎛️ OPTIONS COMPLIANCE  
+  □ از option groups موجود در options.py استفاده شده
+  □ تکرار options وجود ندارد
+  □ reporting_options برای CLI commands اضافه شده
+  □ validate_option_combination استفاده شده (در صورت نیاز)
+
 □ 📊 REPORT GENERATION (MANDATORY)
   □ JSON report option implemented
   □ TXT report option implemented  
@@ -1670,6 +1269,18 @@ python main.py new-command input-data --option value
   □ Help text includes report options
   □ Error handling for report generation
   □ Success/failure logging for reports
+
+□ 🔗 BACKWARD COMPATIBILITY
+  □ Import های قدیمی همچنان کار می‌کنند
+  □ CLI registration به‌روزرسانی شده
+  □ Conditional imports برای optional features
+  □ __init__.py های مربوطه به‌روزرسانی شده
+
+□ ⚙️ METHOD VERIFICATION (اجباری)
+  □ تمام method signatures تأیید شده
+  □ Parameter count ها صحیح هستند
+  □ hasattr checks برای optional methods اضافه شده
+  □ Error handling برای missing features
 
 □ 📋 QUALITY & STANDARDS
   □ Report format validation
@@ -1786,4 +1397,4 @@ vi docs/development_guide.md
 - **docs/tools-list.md**: ابزارها و پکیج‌های مجاز 
 - **docs/development_guide.md**: این سند راهبردی
 
-**🔄 فرآیند**: roadmap → tools → development → implementation → testing → deployment → documentation
+**🔄 فرآیند**: roadmap → tools → development → implementation → testing → deployment → documentation۰

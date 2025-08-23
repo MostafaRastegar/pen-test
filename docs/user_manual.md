@@ -238,6 +238,24 @@ python main.py api https://api.example.com/graphql --graphql-test
 python main.py api https://api.example.com --jwt-analysis
 ```
 
+### **8. Subdomain Scanner** 🆕
+Advanced subdomain discovery and enumeration using multiple tools and techniques.
+
+#### **Basic Usage**
+```bash
+# Basic subdomain enumeration
+python main.py subdomain example.com
+
+# Use all available tools
+python main.py subdomain example.com --tools all
+
+# Specific tool selection
+python main.py subdomain example.com --tools subfinder,assetfinder
+
+# With comprehensive reporting
+python main.py subdomain example.com --tools all --all-reports
+```
+
 #### **Advanced Options**
 ```bash
 # Complete API assessment

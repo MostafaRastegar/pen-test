@@ -148,7 +148,7 @@ src/cli/
 │   ├── __init__.py               # لایه سازگاری معکوس
 │   ├── core_commands.py          # فرمان‌های اصلی (scan, quick, full)
 │   ├── info_commands.py          # اطلاعات (info, list-tools, version)
-│   ├── network_commands.py       # شبکه (port, dns, network)
+│   ├── network_commands.py       # شبکه (port, dns, network, subdomians)
 │   ├── web_commands.py           # وب (web, directory, ssl, api)
 │   ├── cms_commands.py           # CMS (wordpress)
 │   ├── security_commands.py      # امنیت (waf)
@@ -164,6 +164,7 @@ src/services/
 ├── scan_service.py          # اصلی: مدیریت workflow ها
 ├── scanner_service.py       # اصلی: اجرای scanner های مجزا
 ├── report_service.py        # اصلی: تولید گزارشات
+├── subdomain_service.py
 ├── info_service.py          # اصلی: اطلاعات سیستم
 └── utility_services.py      # کمکی: Version, Tool, Cache
 ```
@@ -1397,4 +1398,4 @@ vi docs/development_guide.md
 - **docs/tools-list.md**: ابزارها و پکیج‌های مجاز 
 - **docs/development_guide.md**: این سند راهبردی
 
-**🔄 فرآیند**: roadmap → tools → development → implementation → testing → deployment → documentation۰
+**🔄 فرآیند**: roadmap → tools → development → implementation → testing → deployment → documentation

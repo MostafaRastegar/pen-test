@@ -1,7 +1,8 @@
 """
 CLI Commands Module
 Main CLI interface using Click framework
-Updated with Phase 2.3 Network Scanner Integration (Backward Compatible)
+Updated with Phase 4.1 Advanced Subdomain Enumeration (Backward Compatible)
+✨ NEW: Advanced Subdomain Enumeration Service Integration
 """
 
 import click
@@ -17,6 +18,7 @@ from .commands import (
     list_tools_command,
     port_command,
     dns_command,
+    subdomain_command,  # ✨ NEW: Advanced Subdomain Enumeration
     web_command,
     directory_command,
     ssl_command,
@@ -65,7 +67,7 @@ def create_cli_app():
     """Create and configure the CLI application with backward compatibility"""
 
     @click.group()
-    @click.version_option(version="0.9.6")  # Updated version for Phase 2.3
+    @click.version_option(version="0.9.7")  # Updated version for Phase 4.1
     @click.option("--debug", is_flag=True, help="Enable debug logging")
     @click.option("--quiet", is_flag=True, help="Quiet mode (minimal output)")
     def cli(debug, quiet):
@@ -77,6 +79,7 @@ def create_cli_app():
 
         Available Features (based on installed dependencies):
         - Core Scanners: Port, DNS, Web, Directory, SSL
+        - Advanced Subdomain Enumeration: Subfinder, Amass, Sublist3r, CT logs
         - WordPress Scanner (if available)
         - API Security Scanner (if available)
         - WAF Detection Engine (if available)
@@ -90,7 +93,7 @@ def create_cli_app():
 
         if not quiet:
             log_banner(
-                "Auto-Pentest Framework v0.9.6 - Phase 2.3 (Backward Compatible)"
+                "Auto-Pentest Framework v0.9.7 - Phase 4.1 (Advanced Subdomain Enumeration)"
             )
 
             # Show availability warnings if needed
@@ -110,6 +113,9 @@ def create_cli_app():
     # Individual scanner commands (always available)
     cli.add_command(port_command, name="port")
     cli.add_command(dns_command, name="dns")
+    cli.add_command(
+        subdomain_command, name="subdomain"
+    )  # ✨ NEW: Advanced Subdomain Enumeration
     cli.add_command(web_command, name="web")
     cli.add_command(directory_command, name="directory")
     cli.add_command(ssl_command, name="ssl")
@@ -146,44 +152,31 @@ def _show_scanner_availability():
         ("API Security Scanner", API_SCANNER_AVAILABLE),
         ("WAF Detection Engine", WAF_SCANNER_AVAILABLE),
         ("Network Vulnerability Scanner", NETWORK_SCANNER_AVAILABLE),
+        ("Advanced Subdomain Enumeration", True),  # ✨ NEW: Always available
     ]
 
+    log_warning("🔧 Scanner Availability Status:")
     for scanner_name, available in scanners_status:
-        if not available:
-            log_warning(f"⚠️  {scanner_name} not available - check dependencies")
+        status = "✅ Available" if available else "❌ Not Available"
+        log_warning(f"   • {scanner_name}: {status}")
 
 
-def get_available_scanners():
-    """Get list of available scanner commands"""
-    available = ["port", "dns", "web", "directory", "ssl"]
-
-    if WORDPRESS_SCANNER_AVAILABLE:
-        available.append("wordpress")
-    if API_SCANNER_AVAILABLE:
-        available.append("api")
-    if WAF_SCANNER_AVAILABLE:
-        available.append("waf")
-    if NETWORK_SCANNER_AVAILABLE:
-        available.append("network")
-
-    return available
+# Make CLI app available for main.py
+cli_app = create_cli_app()
 
 
-def get_scanner_availability_status():
-    """Get detailed scanner availability status"""
-    return {
-        "core_scanners": True,  # Always available
-        "wordpress_scanner": WORDPRESS_SCANNER_AVAILABLE,
-        "api_scanner": API_SCANNER_AVAILABLE,
-        "waf_scanner": WAF_SCANNER_AVAILABLE,
-        "network_scanner": NETWORK_SCANNER_AVAILABLE,
-    }
+def main():
+    """Main entry point for CLI"""
+    try:
+        cli_app()
+    except KeyboardInterrupt:
+        log_warning("\n🛑 Operation interrupted by user")
+    except Exception as e:
+        from ..utils.logger import log_error
+
+        log_error(f"💥 CLI Error: {e}")
+        raise
 
 
-# Export for backward compatibility
-__all__ = [
-    "create_cli_app",
-    "get_available_scanners",
-    "get_scanner_availability_status",
-    "common_options",
-]
+if __name__ == "__main__":
+    main()

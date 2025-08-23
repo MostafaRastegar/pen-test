@@ -14,7 +14,6 @@
 1️⃣ features_roadmap.md          # نقشه راه و برنامه‌ریزی پروژه
 2️⃣ docs/tools-list.md           # ابزارها و پکیج‌های مجاز
 3️⃣ docs/development_guide.md    # این سند راهبردی
-4️⃣ src/cli/README.md           # ✨ جدید: راهنمای CLI Architecture
 ```
 
 #### **Step 0.1: مطالعه نقشه راه پروژه**
@@ -148,7 +147,7 @@ src/cli/
 │   ├── __init__.py               # لایه سازگاری معکوس
 │   ├── core_commands.py          # فرمان‌های اصلی (scan, quick, full)
 │   ├── info_commands.py          # اطلاعات (info, list-tools, version)
-│   ├── network_commands.py       # شبکه (port, dns, network, subdomians)
+│   ├── network_commands.py       # شبکه (port, dns, network)
 │   ├── web_commands.py           # وب (web, directory, ssl, api)
 │   ├── cms_commands.py           # CMS (wordpress)
 │   ├── security_commands.py      # امنیت (waf)
@@ -164,7 +163,6 @@ src/services/
 ├── scan_service.py          # اصلی: مدیریت workflow ها
 ├── scanner_service.py       # اصلی: اجرای scanner های مجزا
 ├── report_service.py        # اصلی: تولید گزارشات
-├── subdomain_service.py
 ├── info_service.py          # اصلی: اطلاعات سیستم
 └── utility_services.py      # کمکی: Version, Tool, Cache
 ```
@@ -353,7 +351,7 @@ class ServiceName(ServiceNameInterface):
             "processed": True
         }
     
-    def _handle_report_generation(self, result: Dict[str, Any], options: Dict[str, Any]) -> bool:
+    def _handle_report_generation(self, result: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
         """
         MANDATORY: Handle report generation for CLI services
         
@@ -362,7 +360,7 @@ class ServiceName(ServiceNameInterface):
             options: CLI options including report format preferences
             
         Returns:
-            bool: True if reports were generated
+            Dict: Report generation result
         """
         # Check if reports are requested
         requested_formats = []
@@ -451,6 +449,40 @@ class ServiceName(ServiceNameInterface):
         }
 ```
 
+### **Method/Class Existence Verification**
+```python
+"""
+MANDATORY: Verify existence before use
+✅ = Verified to exist
+❌ = Does not exist - must create or find alternative
+⚠️  = Exists but needs verification of specific method
+"""
+
+# Core imports verification
+from ..core.validator import InputValidator  # ✅ EXISTS: src/core/validator.py
+from ..core.scanner_base import ScannerBase  # ✅ EXISTS: src/core/scanner_base.py
+from ..utils.logger import log_info, log_error  # ✅ EXISTS: src/utils/logger.py
+
+# Service imports verification  
+from ..services.report_service import ReportService  # ✅ EXISTS: src/services/report_service.py
+from ..services.scan_service import ScanService  # ✅ EXISTS: src/services/scan_service.py
+
+# Method existence verification
+report_service = ReportService()
+# ⚠️  VERIFY: Does ReportService have generate_service_report method?
+# If not, add it following existing patterns
+
+scanner_service = ScannerService() 
+# ✅ VERIFIED: ScannerService exists with standard methods
+
+# Before using any method, verify it exists:
+if hasattr(report_service, 'generate_service_report'):
+    report_service.generate_service_report(data)
+else:
+    # Use existing method or implement new one
+    report_service.generate_report(data)
+```
+
 #### **Step 2.2: Service Registration**
 ```python
 # File: src/services/__init__.py
@@ -481,7 +513,7 @@ __all__ = [
 
 #### **Step 3.1: تعیین فایل مناسب برای Command**
 ```python
-# ✨ تحلیل ماهیت Command
+# ✨ تحلیل ماهیت Command برای انتخاب فایل مناسب
 COMMAND_CATEGORIZATION = {
     # Core workflow commands
     "scan_related": "src/cli/commands/core_commands.py",
@@ -519,8 +551,8 @@ new_command_analysis = {
 # File: src/cli/commands/utility_commands.py (بر اساس categorization)
 import click
 import sys
-from ..services.new_service import NewService  # ✅ VERIFY: src/services/new_service.py exists
-from ..utils.logger import log_info, log_error, log_success  # ✅ VERIFY: src/utils/logger.py exists
+from ...services.new_service import NewService  # ✅ VERIFY: src/services/new_service.py exists
+from ...utils.logger import log_info, log_error, log_success  # ✅ VERIFY: src/utils/logger.py exists
 
 # ✨ استفاده از enhanced options
 from ..options import (
@@ -697,7 +729,6 @@ class TestNewCommand:
 # File: tests/integration/test_new_service_integration.py
 import unittest
 from src.services.new_service import NewService
-from src.cli.commands.utility_commands import new_command
 
 class TestNewServiceIntegration(unittest.TestCase):
     """Integration tests for NewService"""
@@ -889,6 +920,10 @@ COMMAND_LOCATIONS = {
     "info_command": "src/cli/commands/info_commands.py",
     "wordpress_command": "src/cli/commands/cms_commands.py",
     "waf_command": "src/cli/commands/security_commands.py",
+    "cache_stats_command": "src/cli/commands/utility_commands.py",
+    "clear_cache_command": "src/cli/commands/utility_commands.py",
+    "version_command": "src/cli/commands/info_commands.py",
+    "list_tools_command": "src/cli/commands/info_commands.py",
     # ... و غیره
 }
 
@@ -904,6 +939,92 @@ def port_command(...):  # تغییر در فایل مربوطه
 # این import ها باید همچنان کار کنند:
 from src.cli.commands import port_command          # ✅ از طریق __init__.py
 from src.cli.commands.network_commands import port_command  # ✅ مستقیم
+```
+
+---
+
+## 📚 **Enhanced Options Usage Guide (Post-Refactoring)**
+
+### **Available Option Groups**
+```python
+# در src/cli/options.py بهبود یافته:
+
+@common_options          # گزینه‌های پایه
+@reporting_options       # JSON, HTML, PDF, TXT, CSV reports
+@scanner_options         # timeout, threads, rate-limit, user-agent, proxy
+@network_options         # ports, scan-type, fast, service-detection
+@web_options            # scan-depth, max-pages, follow-redirects
+@dns_options            # subdomain-enum, zone-transfer, dns-bruteforce
+@ssl_options            # check-cert, check-protocols, check-ciphers
+@api_options            # swagger-url, api-format, auth-header
+
+# Composite options
+@full_scan_options      # همه گزینه‌ها
+@network_scan_options   # ترکیب network + dns + reporting
+@web_scan_options       # ترکیب web + ssl + reporting
+```
+
+### **Example Usage**
+```python
+@click.command()
+@click.argument("target")
+@web_scan_options       # ✨ یک خط = همه گزینه‌های وب
+def advanced_web_command(target, **kwargs):
+    """Advanced web scanning with all options"""
+    # All web, SSL, and reporting options automatically available
+    pass
+```
+
+### **Options Validation**
+```python
+# ✨ جدید: اعتبارسنجی ترکیب options
+from ..options import validate_option_combination
+
+def database_command(target, db_type, **kwargs):
+    # Validate option combination
+    if not validate_option_combination(kwargs):
+        log_error("❌ Invalid option combination")
+        sys.exit(1)
+    
+    # Continue with command implementation
+```
+
+---
+
+## 🧪 **Testing Strategy (Post-Refactoring)**
+
+### **Testing Individual Command Files**
+```python
+# File: tests/cli/test_network_commands.py
+import pytest
+from src.cli.commands.network_commands import port_command, dns_command
+
+class TestNetworkCommands:
+    def test_port_command_help(self):
+        """Test port command help works"""
+        # Test implementation
+        
+    def test_dns_command_parameters(self):
+        """Test DNS command parameter validation"""
+        # Test implementation
+```
+
+### **Testing Backward Compatibility**
+```python
+# File: tests/cli/test_backward_compatibility.py
+def test_old_imports_still_work():
+    """Ensure old import patterns still function"""
+    # Test that old code doesn't break
+    from src.cli.commands import scan_command, port_command
+    assert callable(scan_command)
+    assert callable(port_command)
+
+def test_commands_availability():
+    """Test command availability reporting"""
+    from src.cli.commands import get_command_availability
+    availability = get_command_availability()
+    assert "core_commands" in availability
+    assert availability["core_commands"] is True
 ```
 
 ---
@@ -954,8 +1075,8 @@ python main.py info
 # 7. Test critical workflows
 python main.py scan test-target --profile quick
 
-# 8. Verify roadmap status update
-echo "📋 Update features_roadmap.md status to 'Completed'"
+# 8. ✅ Update roadmap status (فقط تیک زدن، نه تغییر محتوا)
+echo "📋 Mark completed items in features_roadmap.md"
 ```
 
 ### **Post-deployment Validation with Standards Check**
@@ -981,7 +1102,7 @@ python -m pytest tests/performance/ --benchmark-only
 
 # Compliance final check
 echo "📋 Final compliance verification:"
-echo "  ✅ features_roadmap.md updated"
+echo "  ✅ features_roadmap.md items marked completed"
 echo "  ✅ docs/tools-list.md compliance verified"
 echo "  ✅ docs/development_guide.md followed"
 ```
@@ -998,7 +1119,7 @@ echo "  ✅ docs/development_guide.md followed"
 - **Phase**: Phase X from features_roadmap.md
 - **Priority**: High/Medium/Low
 - **Dependencies**: [List verified dependencies]
-- **Status Update**: features_roadmap.md updated to "Completed"
+- **Status Update**: features_roadmap.md items marked completed
 
 ### Tools Compliance ✅  
 - **Reference**: docs/tools-list.md
@@ -1023,7 +1144,7 @@ echo "  ✅ docs/development_guide.md followed"
 - **Report Generation**: ✅ JSON, TXT, HTML working
 
 ## Post-Deployment Actions
-- [ ] Update features_roadmap.md status
+- [ ] Mark completed items in features_roadmap.md
 - [ ] Archive development branch
 - [ ] Update project documentation
 - [ ] Notify team of new capability
@@ -1210,7 +1331,7 @@ python main.py new-command input-data --option value
 
 □ 🚀 DEPLOYMENT READINESS
   □ Deployment checklist completed
-  □ features_roadmap.md ready for status update
+  □ features_roadmap.md ready for status marking
   □ Team notification prepared
 ```
 
@@ -1266,7 +1387,7 @@ python main.py new-command input-data --option value
 
 □ 🔧 INTEGRATION & FUNCTIONALITY
   □ Report generation integrated with ReportService
-  □ CLI command properly registered in main.py
+  □ CLI command properly registered in __init__.py
   □ Help text includes report options
   □ Error handling for report generation
   □ Success/failure logging for reports
@@ -1318,8 +1439,8 @@ python main.py new-command input-data --option value
   □ Team notification prepared
   □ Deployment plan finalized
 
-□ 🚀 ROADMAP UPDATE READINESS
-  □ features_roadmap.md status update prepared
+□ 🚀 ROADMAP STATUS
+  □ features_roadmap.md items ready for completion marking
   □ Phase completion documented
   □ Next phase dependencies verified
   □ Success metrics defined
@@ -1346,11 +1467,9 @@ python main.py new-command input-data --option value
 
 ### **نحوه مدیریت فایل‌های مرجع**
 ```bash
-# بروزرسانی نقشه راه پروژه
-git checkout main
-vi features_roadmap.md
-# وضعیت فیچر را از "Planned" به "In Progress" تغییر دهید
-# پس از تکمیل به "Completed" تغییر دهید
+# مراجعه به نقشه راه پروژه (فقط خواندن)
+cat features_roadmap.md
+# فقط آیتم‌های تکمیل شده را تیک بزنید، محتوا را تغییر ندهید
 
 # بروزرسانی لیست ابزارها (در صورت نیاز)
 vi docs/tools-list.md
@@ -1367,9 +1486,9 @@ vi docs/development_guide.md
 📋 مسئولیت‌های نگهداری:
 
 1. features_roadmap.md:
-   - بروزرسانی وضعیت فیچرها
-   - اضافه کردن فیچرهای جدید
-   - تنظیم اولویت‌بندی
+   - فقط تیک زدن آیتم‌های تکمیل شده
+   - عدم تغییر محتوا یا اضافه/کم کردن آیتم
+   - حفظ ساختار اصلی
 
 2. docs/tools-list.md:
    - تأیید ابزارهای جدید
@@ -1394,7 +1513,7 @@ vi docs/development_guide.md
 **🎯 این سند راهبردی خط قرمز توسعه پروژه Auto-Pentest Framework است و باید در تمام مراحل توسعه و تغییر سرویس‌ها به‌دقت رعایت شود.**
 
 **📋 مراجع اصلی:**
-- **features_roadmap.md**: نقشه راه و برنامه‌ریزی پروژه
+- **features_roadmap.md**: نقشه راه و برنامه‌ریزی پروژه (فقط خواندن و تیک زدن)
 - **docs/tools-list.md**: ابزارها و پکیج‌های مجاز 
 - **docs/development_guide.md**: این سند راهبردی
 

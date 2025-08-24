@@ -1,10 +1,10 @@
 """
-Commands Directory __init__.py - Backward Compatibility Layer
+Commands Directory __init__.py - Updated with OSINT Integration
 FILE PATH: src/cli/commands/__init__.py
 
+✨ UPDATED: Added OSINT & Information Gathering Commands (Phase 4.2)
 Imports all commands from organized modules to maintain 100% backward compatibility
 Following SOLID principles and clean architecture
-✨ Updated with Advanced Subdomain Enumeration Service (Phase 4.1)
 """
 
 # Core Commands (always available)
@@ -25,7 +25,7 @@ from .info_commands import (
 from .network_commands import (
     port_command,
     dns_command,
-    subdomain_command,  # ✨ NEW ADDITION - Advanced Subdomain Enumeration
+    subdomain_command,  # ✨ NEW ADDITION - AdvancedS Subdomain Enumeration
 )
 
 # Web Commands (always available)
@@ -41,7 +41,30 @@ from .utility_commands import (
     clear_cache_command,
 )
 
-# Conditional imports for advanced features (backward compatibility)
+# ✨ NEW: OSINT Commands Group (conditional import)
+try:
+    from .osint_commands import (
+        osint_group,
+        email_harvest_command as osint_email_command,
+        search_recon_command,
+        whois_analysis_command,
+        comprehensive_osint_command,
+        osint_info_command,
+        osint_test_command,
+    )
+
+    OSINT_COMMANDS_AVAILABLE = True
+except ImportError:
+    osint_group = None
+    osint_email_command = None
+    search_recon_command = None
+    whois_analysis_command = None
+    comprehensive_osint_command = None
+    osint_info_command = None
+    osint_test_command = None
+    OSINT_COMMANDS_AVAILABLE = False
+
+# Conditional imports for advanced features (existing)
 try:
     from .network_commands import network_command
 
@@ -77,7 +100,7 @@ except ImportError:
     SECURITY_COMMANDS_AVAILABLE = False
 
 
-# Export all available commands for backward compatibility
+# All available commands export (updated with OSINT)
 __all__ = [
     # Core commands (always available)
     "scan_command",
@@ -87,10 +110,12 @@ __all__ = [
     "info_command",
     "list_tools_command",
     "version_command",
-    # Network commands (always available)
+    # Network commands (always available + NEW OSINT)
     "port_command",
     "dns_command",
-    "subdomain_command",  # ✨ NEW ADDITION - Advanced Subdomain Enumeration
+    "subdomain_command",
+    "osint_command",  # ✨ NEW - Main OSINT command
+    "email_harvest_command",  # ✨ NEW - Email harvesting command
     # Web commands (always available)
     "web_command",
     "directory_command",
@@ -98,20 +123,24 @@ __all__ = [
     # Utility commands (always available)
     "cache_stats_command",
     "clear_cache_command",
+    # Helper functions
+    "get_command_availability",
+    "get_available_commands",
 ]
 
-# Add conditional commands to exports if available
-if NETWORK_COMMAND_AVAILABLE:
-    __all__.append("network_command")
-
-if API_COMMAND_AVAILABLE:
-    __all__.append("api_command")
-
-if CMS_COMMANDS_AVAILABLE:
-    __all__.append("wordpress_command")
-
-if SECURITY_COMMANDS_AVAILABLE:
-    __all__.append("waf_command")
+# ✨ NEW: Add OSINT commands to exports if available
+if OSINT_COMMANDS_AVAILABLE:
+    __all__.extend(
+        [
+            "osint_group",
+            "osint_email_command",
+            "search_recon_command",
+            "whois_analysis_command",
+            "comprehensive_osint_command",
+            "osint_info_command",
+            "osint_test_command",
+        ]
+    )
 
 
 def get_command_availability():
@@ -119,7 +148,7 @@ def get_command_availability():
     Get availability status of all commands
 
     Returns:
-        Dict[str, bool]: Command availability mapping
+        Dict[str, bool]: Command name -> availability status
     """
     return {
         # Core commands (always available)
@@ -133,7 +162,11 @@ def get_command_availability():
         # Network commands (always available)
         "port_command": True,
         "dns_command": True,
-        "subdomain_command": True,  # ✨ NEW: Always available
+        "subdomain_command": True,
+        # ✨ NEW: OSINT commands availability
+        "osint_command": True,  # Main OSINT command (always available in network)
+        "email_harvest_command": True,  # Email harvest (always available in network)
+        "osint_commands_group": OSINT_COMMANDS_AVAILABLE,  # Full OSINT group (conditional)
         # Web commands (always available)
         "web_command": True,
         "directory_command": True,
@@ -141,7 +174,7 @@ def get_command_availability():
         # Utility commands (always available)
         "cache_stats_command": True,
         "clear_cache_command": True,
-        # Conditional commands
+        # Conditional commands (existing)
         "network_command": NETWORK_COMMAND_AVAILABLE,
         "api_command": API_COMMAND_AVAILABLE,
         "wordpress_command": CMS_COMMANDS_AVAILABLE,
@@ -158,6 +191,49 @@ def get_available_commands():
     """
     availability = get_command_availability()
     return [cmd for cmd, available in availability.items() if available]
+
+
+# ✨ NEW: OSINT-specific helper functions
+def get_osint_command_availability():
+    """Get OSINT command availability details"""
+    return {
+        "main_osint_command": True,  # Always available (in network commands)
+        "email_harvest_command": True,  # Always available (in network commands)
+        "osint_commands_group": OSINT_COMMANDS_AVAILABLE,  # Conditional (separate module)
+        "service_status": OSINT_COMMANDS_AVAILABLE,
+        "free_services_only": True,
+        "rate_limited": True,
+    }
+
+
+def get_osint_usage_help():
+    """Get OSINT usage help text"""
+    if not OSINT_COMMANDS_AVAILABLE:
+        return "OSINT commands not available. Install dependencies: sudo apt install theharvester whois"
+
+    return """
+🔍 OSINT & Information Gathering Commands (Phase 4.2):
+
+Main Commands:
+  python main.py osint <target>                    # Comprehensive OSINT scan
+  python main.py email-harvest <target>           # Email harvesting only
+
+OSINT Group Commands:
+  python main.py osint email <target>             # Detailed email harvesting
+  python main.py osint search <target>            # Search engine reconnaissance
+  python main.py osint whois <target>             # Enhanced WHOIS analysis
+  python main.py osint comprehensive <target>     # Complete OSINT gathering
+
+Key Features:
+  ✅ Free services only (no API keys required)
+  ✅ Rate-limited (respectful usage)
+  ✅ Multi-format reporting (JSON, HTML, TXT)
+  ✅ Email harvesting with validation
+  ✅ Search engine dorking patterns
+  ✅ Enhanced WHOIS analysis with geolocation
+  ✅ Social media profile discovery
+  ✅ Certificate transparency analysis
+"""
 
 
 # Legacy imports for any code that might use these (backward compatibility)
@@ -184,8 +260,15 @@ try:
         ScannerService,
         InfoService,
         ReportService,
-        SubdomainService,  # ✨ NEW ADDITION
+        SubdomainService,
     )
+
+    # ✨ NEW: Add OSINT service to backward compatibility exports
+    try:
+        from ...services.osint_service import OSINTService
+    except ImportError:
+        OSINTService = None
+
 except ImportError:
     # Handle missing services gracefully
     pass
@@ -198,73 +281,3 @@ try:
 except ImportError:
     # Handle missing utilities gracefully
     pass
-
-# Re-export options for backward compatibility
-try:
-    from ..options import common_options
-except ImportError:
-    # Handle missing options gracefully
-    common_options = None
-
-
-# Export everything for backward compatibility
-__all__.extend(
-    [
-        # Helper functions
-        "get_command_availability",
-        "get_available_commands",
-        # Legacy exports (if available)
-        "ScanStatus",
-        "common_options",
-        "ScanService",
-        "ScannerService",
-        "InfoService",
-        "ReportService",
-        "SubdomainService",  # ✨ NEW ADDITION
-        "TargetParser",
-        "log_info",
-        "log_error",
-        "log_success",
-        "log_warning",
-        "ReportGenerator",
-    ]
-)
-
-
-# Compatibility function for migration verification
-def verify_backward_compatibility():
-    """
-    Verify that all original commands are still available
-    Used for testing and migration verification
-
-    Returns:
-        bool: True if all core commands are available
-    """
-    core_commands = [
-        "scan_command",
-        "quick_command",
-        "full_command",
-        "info_command",
-        "list_tools_command",
-        "version_command",
-        "port_command",
-        "dns_command",
-        "subdomain_command",  # ✨ NEW
-        "web_command",
-        "directory_command",
-        "ssl_command",
-        "cache_stats_command",
-        "clear_cache_command",
-    ]
-
-    availability = get_command_availability()
-
-    for cmd in core_commands:
-        if not availability.get(cmd, False):
-            return False
-
-    return True
-
-
-# Add verification function to exports
-__all__.append("verify_backward_compatibility")

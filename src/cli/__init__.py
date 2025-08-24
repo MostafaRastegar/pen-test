@@ -1,8 +1,7 @@
 """
 CLI Commands Module
 Main CLI interface using Click framework
-Updated with Phase 4.1 Advanced Subdomain Enumeration (Backward Compatible)
-✨ NEW: Advanced Subdomain Enumeration Service Integration
+✨ UPDATED: Added OSINT & Information Gathering Service (Phase 4.2)
 """
 
 import click
@@ -18,7 +17,7 @@ from .commands import (
     list_tools_command,
     port_command,
     dns_command,
-    subdomain_command,  # ✨ NEW: Advanced Subdomain Enumeration
+    subdomain_command,
     web_command,
     directory_command,
     ssl_command,
@@ -26,6 +25,15 @@ from .commands import (
     cache_stats_command,
     clear_cache_command,
 )
+
+# ✨ NEW: Import OSINT commands (Phase 4.2)
+try:
+    from .commands import osint_group
+
+    OSINT_AVAILABLE = True
+except ImportError:
+    osint_group = None
+    OSINT_AVAILABLE = False
 
 # Conditionally import advanced scanner commands for backward compatibility
 try:
@@ -67,7 +75,7 @@ def create_cli_app():
     """Create and configure the CLI application with backward compatibility"""
 
     @click.group()
-    @click.version_option(version="0.9.7")  # Updated version for Phase 4.1
+    @click.version_option(version="0.9.7")  # Updated version for Phase 4.2
     @click.option("--debug", is_flag=True, help="Enable debug logging")
     @click.option("--quiet", is_flag=True, help="Quiet mode (minimal output)")
     def cli(debug, quiet):
@@ -75,11 +83,14 @@ def create_cli_app():
         Auto-Pentest Tool - Enhanced Automated Penetration Testing Framework
 
         A comprehensive tool for automated security testing and vulnerability assessment
-        with professional reporting capabilities including PDF export.
+        with professional reporting capabilities.
+
+        ✨ NEW: OSINT & Information Gathering (Phase 4.2)
 
         Available Features (based on installed dependencies):
         - Core Scanners: Port, DNS, Web, Directory, SSL
         - Advanced Subdomain Enumeration: Subfinder, Amass, Sublist3r, CT logs
+        - OSINT & Information Gathering: Email harvesting, Search recon, WHOIS analysis
         - WordPress Scanner (if available)
         - API Security Scanner (if available)
         - WAF Detection Engine (if available)
@@ -92,9 +103,7 @@ def create_cli_app():
         LoggerSetup.setup_logger(name="auto-pentest", level=level, use_rich=True)
 
         if not quiet:
-            log_banner(
-                "Auto-Pentest Framework v0.9.7 - Phase 4.1 (Advanced Subdomain Enumeration)"
-            )
+            log_banner("Auto-Pentest Framework v0.9.7 - Phase 4.2")
 
             # Show availability warnings if needed
             if not quiet and debug:
@@ -138,6 +147,15 @@ def create_cli_app():
     if NETWORK_SCANNER_AVAILABLE and network_command:
         cli.add_command(network_command, name="network")
 
+    # ✨ NEW: Register OSINT commands (Phase 4.2)
+    if OSINT_AVAILABLE and osint_group:
+        cli.add_command(osint_group, name="osint")
+        log_warning("✅ OSINT & Information Gathering commands available (Phase 4.2)")
+    else:
+        log_warning(
+            "⚠️ OSINT commands not available - install dependencies: sudo apt install theharvester whois"
+        )
+
     # Utility commands (always available)
     cli.add_command(cache_stats_command, name="cache-stats")
     cli.add_command(clear_cache_command, name="clear-cache")
@@ -152,6 +170,7 @@ def _show_scanner_availability():
         ("API Security Scanner", API_SCANNER_AVAILABLE),
         ("WAF Detection Engine", WAF_SCANNER_AVAILABLE),
         ("Network Vulnerability Scanner", NETWORK_SCANNER_AVAILABLE),
+        ("OSINT Scanner", OSINT_AVAILABLE),
         ("Advanced Subdomain Enumeration", True),  # ✨ NEW: Always available
     ]
 

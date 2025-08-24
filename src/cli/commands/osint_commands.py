@@ -84,18 +84,19 @@ def email_harvest_command(
             "generate_report": True,
         }
 
-        # Handle report format flags
+        # Handle report format flags (following project patterns)
         if json_report or html_report or txt_report:
-            report_formats = []
             if json_report:
-                report_formats.append("json")
+                scan_options["json_report"] = True
             if html_report:
-                report_formats.append("html")
+                scan_options["html_report"] = True
             if txt_report:
-                report_formats.append("txt")
-            scan_options["output_format"] = ",".join(report_formats)
+                scan_options["txt_report"] = True
         elif output_format == "all":
-            scan_options["output_format"] = "json,html,txt"
+            scan_options["all_reports"] = True
+        else:
+            # Default JSON report if no specific format
+            scan_options["json_report"] = True
 
         # Execute email harvesting
         results = run_osint_scan(target, scan_options)
@@ -173,18 +174,19 @@ def search_recon_command(
             "generate_report": True,
         }
 
-        # Handle report format flags
+        # Handle report format flags (following project patterns)
         if json_report or html_report or txt_report:
-            report_formats = []
             if json_report:
-                report_formats.append("json")
+                scan_options["json_report"] = True
             if html_report:
-                report_formats.append("html")
+                scan_options["html_report"] = True
             if txt_report:
-                report_formats.append("txt")
-            scan_options["output_format"] = ",".join(report_formats)
+                scan_options["txt_report"] = True
         elif output_format == "all":
-            scan_options["output_format"] = "json,html,txt"
+            scan_options["all_reports"] = True
+        else:
+            # Default JSON report if no specific format
+            scan_options["json_report"] = True
 
         # Execute search reconnaissance
         results = run_osint_scan(target, scan_options)
@@ -262,18 +264,19 @@ def whois_analysis_command(
             "generate_report": True,
         }
 
-        # Handle report format flags
+        # Handle report format flags (following project patterns)
         if json_report or html_report or txt_report:
-            report_formats = []
             if json_report:
-                report_formats.append("json")
+                scan_options["json_report"] = True
             if html_report:
-                report_formats.append("html")
+                scan_options["html_report"] = True
             if txt_report:
-                report_formats.append("txt")
-            scan_options["output_format"] = ",".join(report_formats)
+                scan_options["txt_report"] = True
         elif output_format == "all":
-            scan_options["output_format"] = "json,html,txt"
+            scan_options["all_reports"] = True
+        else:
+            # Default JSON report if no specific format
+            scan_options["json_report"] = True
 
         # Execute WHOIS analysis
         results = run_osint_scan(target, scan_options)
@@ -355,18 +358,19 @@ def comprehensive_osint_command(
             "certificate_analysis": True,
         }
 
-        # Handle report format flags
+        # Handle report format flags (following project patterns)
         if json_report or html_report or txt_report:
-            report_formats = []
             if json_report:
-                report_formats.append("json")
+                scan_options["json_report"] = True
             if html_report:
-                report_formats.append("html")
+                scan_options["html_report"] = True
             if txt_report:
-                report_formats.append("txt")
-            scan_options["output_format"] = ",".join(report_formats)
+                scan_options["txt_report"] = True
         elif output_format == "all":
-            scan_options["output_format"] = "json,html,txt"
+            scan_options["all_reports"] = True
+        else:
+            # Default JSON report if no specific format
+            scan_options["json_report"] = True
 
         # Execute comprehensive OSINT
         results = run_osint_scan(target, scan_options)

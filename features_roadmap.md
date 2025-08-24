@@ -115,13 +115,13 @@
 - ✅ **DNS Bruteforce** - Dictionary-based subdomain discovery
 - ✅ **Permutation Generation** - Subdomain variation generation
 
-#### **4.2 OSINT & Information Gathering** ❌ **NOT IMPLEMENTED**
-- ❌ **Email Harvesting** - Extract emails from web sources
-- ❌ **TheHarvester Integration** - OSINT gathering tool
-- ❌ **Google Dorking** - Search engine reconnaissance
-- ❌ **Shodan Integration** - IoT device discovery
-- ❌ **Social Media Recon** - Social media profile enumeration
-- ❌ **WHOIS Analysis** - Enhanced domain registration data
+#### **4.2 OSINT & Information Gathering** ✅ **NOT IMPLEMENTED**
+- ✅ **Email Harvesting** - Extract emails from web sources
+- ✅ **TheHarvester Integration** - OSINT gathering tool
+- ✅ **Google Dorking** - Search engine reconnaissance
+- ✅ **Social Media Recon** - Social media profile enumeration
+- ✅ **WHOIS Analysis** - Enhanced domain registration data
+- ❌ **Shodan Integration** - IoT device discovery (optional)
 
 #### **4.3 Network Protocol Scanners** ❌ **NOT IMPLEMENTED**
 - ❌ **SMB Scanner** - SMB/NetBIOS enumeration (enum4linux, smbclient)

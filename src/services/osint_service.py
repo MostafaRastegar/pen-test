@@ -25,7 +25,6 @@ from ..utils.logger import (
     log_success,
     log_warning,
 )  # ✅ src/utils/logger.py
-from ..services.report_service import ReportService  # ✅ src/services/report_service.py
 
 
 class OSINTServiceInterface(ABC):
@@ -76,7 +75,6 @@ class OSINTService(OSINTServiceInterface):
     def __init__(self):
         """Initialize OSINT service with free service configurations"""
         self.validator = InputValidator()
-        self.report_service = ReportService()
 
         # Free service configurations
         self.free_apis = {
@@ -116,7 +114,7 @@ class OSINTService(OSINTServiceInterface):
             options = {}
 
         # Validate target
-        if not self.validator.validate_domain(target):
+        if not self.validator.validate_target(target):
             log_error(f"❌ Invalid target domain: {target}")
             return {"status": "error", "message": "Invalid domain"}
 
@@ -1197,33 +1195,188 @@ def run_osint_scan(target: str, options: Dict[str, Any]) -> Dict[str, Any]:
         # Comprehensive OSINT (default)
         results = osint_service.comprehensive_osint(target, options)
 
-    # Mandatory reporting integration
-    if options.get("generate_report", True):
-        report_service = ReportService()
+    # Handle reporting using project pattern
+    if options.get("generate_report", True) and results.get("status") != "error":
+        try:
+            from ..services.report_service import ReportService
+            from ..core.scanner_base import ScanResult, ScanStatus
+            from ..orchestrator.workflow import (
+                WorkflowResult,
+                WorkflowStatus,
+                ScanTask,
+                ScanPhase,
+            )
 
-        # Generate report data
-        report_data = {
-            "scan_type": "OSINT",
-            "target": target,
-            "timestamp": datetime.now().isoformat(),
-            "results": results,
-            "service_info": osint_service.get_service_info(),
-        }
+            report_service = ReportService()
 
-        # Generate reports in requested formats
-        output_format = options.get("output_format", "json")
+            # Convert OSINT results to findings format
+            findings = []
 
-        if "json" in output_format:
-            json_report = report_service.generate_json_report(report_data)
-            log_success(f"✅ JSON report generated: {json_report.get('file_path')}")
+            # Process different result types
+            if scan_type == "search" and "google_dorks" in results:
+                for dork in results["google_dorks"]:
+                    findings.append(
+                        {
+                            "title": f"Google Dork Pattern",
+                            "description": dork.get("description", ""),
+                            "pattern": dork.get("pattern", ""),
+                            "risk_level": dork.get("risk_level", "Medium"),
+                            "severity": dork.get("risk_level", "medium").lower(),
+                            "type": "google_dork",
+                        }
+                    )
 
-        if "html" in output_format:
-            html_report = report_service.generate_html_report(report_data)
-            log_success(f"✅ HTML report generated: {html_report.get('file_path')}")
+                for result in results.get("bing_results", []):
+                    findings.append(
+                        {
+                            "title": "Bing Search Pattern",
+                            "description": result.get("description", ""),
+                            "pattern": result.get("search_pattern", ""),
+                            "severity": "info",
+                            "type": "bing_search",
+                        }
+                    )
 
-        if "txt" in output_format:
-            txt_report = report_service.generate_text_report(report_data)
-            log_success(f"✅ TXT report generated: {txt_report.get('file_path')}")
+                for profile in results.get("social_media", []):
+                    findings.append(
+                        {
+                            "title": f"Social Media Profile Found",
+                            "description": f"{profile.get('platform', '').title()} profile discovered",
+                            "url": profile.get("url", ""),
+                            "platform": profile.get("platform", ""),
+                            "severity": "info",
+                            "type": "social_media",
+                        }
+                    )
+
+            elif scan_type == "email" and "emails" in results:
+                for email in results["emails"]:
+                    findings.append(
+                        {
+                            "title": "Email Address Discovered",
+                            "description": f"Email found via OSINT",
+                            "email": email,
+                            "severity": "info",
+                            "type": "email",
+                        }
+                    )
+
+            elif scan_type == "whois":
+                whois_data = results.get("whois_data", {})
+                if whois_data:
+                    findings.append(
+                        {
+                            "title": "WHOIS Information",
+                            "description": "Domain registration details",
+                            "registrar": whois_data.get("registrar", "Unknown"),
+                            "creation_date": whois_data.get("creation_date", "Unknown"),
+                            "severity": "info",
+                            "type": "whois",
+                        }
+                    )
+
+                geo_data = results.get("ip_geolocation", {})
+                if geo_data:
+                    findings.append(
+                        {
+                            "title": "IP Geolocation",
+                            "description": "Geographic location of target IP",
+                            "country": geo_data.get("country", "Unknown"),
+                            "isp": geo_data.get("isp", "Unknown"),
+                            "severity": "info",
+                            "type": "geolocation",
+                        }
+                    )
+
+            elif scan_type == "comprehensive":
+                # Process all comprehensive results
+                email_results = results.get("email_harvest", {})
+                for email in email_results.get("emails", []):
+                    findings.append(
+                        {
+                            "title": "Email Address",
+                            "description": "Email found via comprehensive OSINT",
+                            "email": email,
+                            "severity": "info",
+                            "type": "email",
+                        }
+                    )
+
+                search_results = results.get("search_recon", {})
+                for profile in search_results.get("social_media", []):
+                    findings.append(
+                        {
+                            "title": "Social Media Profile",
+                            "description": f"{profile.get('platform', '').title()} profile",
+                            "url": profile.get("url", ""),
+                            "platform": profile.get("platform", ""),
+                            "severity": "info",
+                            "type": "social_media",
+                        }
+                    )
+
+                for subdomain in search_results.get("subdomains", []):
+                    findings.append(
+                        {
+                            "title": "Subdomain Discovered",
+                            "description": "Subdomain found via search engines",
+                            "subdomain": subdomain,
+                            "severity": "info",
+                            "type": "subdomain",
+                        }
+                    )
+
+            # Create proper scan result with findings
+            osint_scan_result = ScanResult(
+                scanner_name=f"OSINT_{scan_type}",
+                target=target,
+                status=ScanStatus.COMPLETED,
+                start_time=datetime.now(),
+                end_time=datetime.now(),
+                findings=findings,  # ✅ Real findings here
+                metadata={
+                    "osint_type": scan_type,
+                    "total_findings": len(findings),
+                    "scan_statistics": results.get("statistics", {}),
+                    "recommendations": results.get("recommendations", []),
+                },
+            )
+
+            # Create scan task (this is what appears in tasks)
+            scan_task = ScanTask(
+                scanner_name=f"OSINT_{scan_type}",
+                scanner_class=type,  # Placeholder
+                target=target,
+                options=options,
+                dependencies=[],
+                phase=ScanPhase.RECONNAISSANCE,  # ✅ Proper phase
+                priority=1,
+                timeout=300,
+                required=True,
+            )
+            scan_task.result = osint_scan_result
+            scan_task.status = ScanStatus.COMPLETED
+            scan_task.start_time = datetime.now()
+            scan_task.end_time = datetime.now()
+
+            # Create workflow result with proper task
+            workflow_result = WorkflowResult(
+                workflow_id=f"osint_{int(datetime.now().timestamp())}",
+                target=target,
+                status=WorkflowStatus.COMPLETED,
+                start_time=datetime.now(),
+                end_time=datetime.now(),
+                tasks=[scan_task],  # ✅ Contains actual scan task
+                aggregated_result=osint_scan_result,
+            )
+
+            # Generate reports using project pattern
+            report_service.generate_reports(workflow_result, options)
+            log_success("✅ OSINT reports generated successfully")
+
+        except Exception as e:
+            log_error(f"❌ Report generation failed: {e}")
+            log_warning("⚠️ Continuing without reports...")
 
     return results
 

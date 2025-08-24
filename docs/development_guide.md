@@ -151,6 +151,7 @@ src/cli/
 │   ├── web_commands.py           # وب (web, directory, ssl, api)
 │   ├── cms_commands.py           # CMS (wordpress)
 │   ├── security_commands.py      # امنیت (waf)
+│   ├── osint_commands.py         # OSINT (email, google dorks, socials account)
 │   └── utility_commands.py       # ابزار (cache-stats, clear-cache)
 ├── options.py                     # ✨ بهبود یافته با DRY
 └── commands.py                    # ✨ لایه سازگاری معکوس
@@ -163,6 +164,7 @@ src/services/
 ├── scan_service.py          # اصلی: مدیریت workflow ها
 ├── scanner_service.py       # اصلی: اجرای scanner های مجزا
 ├── report_service.py        # اصلی: تولید گزارشات
+├── osint _service.py        # OSINT
 ├── info_service.py          # اصلی: اطلاعات سیستم
 └── utility_services.py      # کمکی: Version, Tool, Cache
 ```

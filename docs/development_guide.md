@@ -41,11 +41,44 @@
 - Integration with existing ReportService
 - Proper error handling and logging
 
+### **4. MANDATORY: Report Service Integration**
+**⚠️ CRITICAL REMINDER: هر سرویس جدید باید به سیستم گزارش‌گیری متصل شود!**
+- Every new service MUST integrate with `ReportService`
+- All scan results MUST generate reports in multiple formats
+- Use `_handle_report_generation()` method pattern
+- Support JSON, HTML, PDF, TXT formats minimum
+- Connect service output directly to ReportService.generate_reports()
+
 ### **4. Development Workflow**
 - **Get approval for long files** (>100 lines) before creation
 - Progressive development with regular validation
 - Test-driven approach with >90% coverage
 - Document while coding, not after
+
+---
+
+## ⚠️ **CRITICAL: Import and Method Verification**
+
+### **🔍 MANDATORY VERIFICATION BEFORE ANY DEVELOPMENT**
+```
+تمامی مواردی که در این فایل ها import کردی و استفاده کردی را یکی یکی بررسی کن 
+ببین متود هایی از درون آنها صدا زدی آیا وجود دارند یا خیر.
+میخوام که تک تک بررسی بشه و مطمن بشی.
+```
+
+### **Verification Checklist:**
+- [ ] **Every import statement** - Verify the module/package exists and is available
+- [ ] **Every method call** - Check method exists in the imported class/module
+- [ ] **Every class instantiation** - Confirm class exists and constructor parameters are correct  
+- [ ] **Every attribute access** - Verify object attributes exist and are accessible
+- [ ] **Every function call** - Check function signature matches your usage
+
+### **How to Verify:**
+1. **Check official documentation** of imported libraries
+2. **Inspect source code** of custom modules before using them
+3. **Test imports** in Python REPL before implementation
+4. **Verify version compatibility** of external packages
+5. **Double-check custom classes** exist in project codebase
 
 ---
 
@@ -60,7 +93,8 @@
 ### **During Development**
 - [ ] Use only approved tools from docs/tools-list.md
 - [ ] Follow SOLID and DRY principles
-- [ ] Verify all imported methods/classes exist
+- [ ] **VERIFY ALL IMPORTS AND METHODS EXIST** ⚠️
+- [ ] **INTEGRATE WITH ReportService** ⚠️ (Import + _handle_report_generation method)
 - [ ] Implement proper error handling
 - [ ] Add comprehensive logging
 - [ ] Document file paths in comments
@@ -87,17 +121,41 @@ CLI Integration: Yes/No
 Reporting: JSON, TXT, [additional formats]
 """
 
+# MANDATORY IMPORT - Always include ReportService
+from ..services.report_service import ReportService  # ✅ VERIFIED
+
 class ServiceName:
     """Single responsibility service implementation"""
     
     def __init__(self):
         # Verify all dependencies exist
         # Initialize with minimal complexity
+        self.report_service = ReportService()  # ⚠️ MANDATORY FOR ALL SERVICES
         
     def main_function(self):
         # Core functionality
         # Proper error handling
         # Logging at appropriate levels
+        
+        # ⚠️ MANDATORY: Always return results for reporting
+        return {
+            "status": "success",
+            "results": {...},
+            "metadata": {...}
+        }
+    
+    def _handle_report_generation(self, result: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        ⚠️ MANDATORY: Handle report generation for CLI services
+        Following DRY principle by reusing ReportService
+        """
+        if not options.get("generate_reports"):
+            return {"generated": False}
+            
+        # Generate reports using ReportService
+        self.report_service.generate_reports(result, options)
+        
+        return {"generated": True, "formats": self._get_requested_formats(options)}
         
     def generate_report(self, format='json'):
         # Integration with ReportService
@@ -163,12 +221,13 @@ class TestServiceName:
 ## 🚫 **Common Pitfalls to Avoid**
 
 1. **Using non-existent methods/classes** → Always verify before use
-2. **Creating unnecessary complexity** → Keep it simple and focused
-3. **Skipping error handling** → Every external call needs error handling
-4. **Missing CLI integration** → All services need CLI access with reporting
-5. **Ignoring existing patterns** → Study and follow current code structure
-6. **Breaking changes** → Never modify existing APIs without approval
-7. **Incomplete testing** → Test all paths, especially error scenarios
+2. **Forgetting ReportService integration** → Every service MUST connect to reporting system
+3. **Creating unnecessary complexity** → Keep it simple and focused
+4. **Skipping error handling** → Every external call needs error handling
+5. **Missing CLI integration** → All services need CLI access with reporting
+6. **Ignoring existing patterns** → Study and follow current code structure
+7. **Breaking changes** → Never modify existing APIs without approval
+8. **Incomplete testing** → Test all paths, especially error scenarios
 
 ---
 
@@ -192,6 +251,7 @@ Reference Check → Approval → Plan → Implement → Test → Document → Re
 - **Compatibility**: Never break existing functionality
 - **Simplicity**: One responsibility per service
 - **Integration**: CLI + Reporting for all services
+- **⚠️ REPORTING**: Every service MUST integrate with ReportService
 
 ---
 
